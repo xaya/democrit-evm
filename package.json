@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@openzeppelin/contracts": "4.8.0",
+    "@xaya/eth-account-registry": "1.0.0",
+    "@xaya/eth-delegator-contract": "0.1.0"
+  },
+  "devDependencies": {
+    "truffle-assertions": "",
+    "@openzeppelin/test-helpers": "",
+    "@truffle/contract": "",
+    "@xaya/wchi": "1.0.0"
+  }
+}
