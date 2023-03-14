@@ -5,6 +5,8 @@
     "@xaya/eth-delegator-contract": "0.1.0"
   },
   "devDependencies": {
+    "chai": "",
+    "chai-as-promised": "",
     "truffle-assertions": "",
     "@openzeppelin/test-helpers": "",
     "@truffle/contract": "",
