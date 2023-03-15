@@ -59,6 +59,10 @@ contract AccountHolder is IERC721Receiver
        will only be spendable on fees, and not be recoverable in any other
        way!  */
     wchi.approve (address (accountRegistry), type (uint256).max);
+
+    /* Also approve WCHI on the delegation contract, so that we can use it
+       to send moves as well.  */
+    wchi.approve (address (delegator), type (uint256).max);
   }
 
   /**

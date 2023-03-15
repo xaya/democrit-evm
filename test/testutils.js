@@ -73,10 +73,51 @@ async function getMoves (acc, fromBlock)
       .map (m => [m.args.name, JSON.parse (m.args.mv)]);
 }
 
+/**
+ * Registers a name (to be used as founder) with the required approvals set
+ * up for the delegation contract.
+ */
+async function createFounder (vm, fromAccount, name)
+{
+  const del = await XayaDelegation.at (await vm.delegator ());
+  const acc = await XayaAccounts.at (await vm.accountRegistry ());
+
+  await acc.register ("p", name, {from: fromAccount});
+  await acc.setApprovalForAll (del.address, true, {from: fromAccount});
+  await del.grant ("p", name, ["g"], vm.address, maxUint256, false,
+                   {from: fromAccount});
+}
+
+/**
+ * Asserts that the data for the vault with the given ID matches
+ * the expected one.
+ */
+async function assertVault (vm, id, founder, asset, balance)
+{
+  const data = await vm.getVault (id);
+  assert.equal (data["founder"], founder);
+  assert.equal (data["asset"], asset);
+  assert.equal (data["balance"], balance.toString ());
+}
+
+/**
+ * Asserts that the given vault does not exist or has been emptied.
+ */
+async function assertNoVault (vm, id)
+{
+  const data = await vm.getVault (id);
+  assert.equal (data["founder"], "");
+  assert.equal (data["asset"], "");
+  assert.equal (data["balance"], "0");
+}
+
 module.exports = {
   nullAddress,
   maxUint256,
   xayaEnvironment,
   initialiseContract,
   getMoves,
+  createFounder,
+  assertVault,
+  assertNoVault,
 };
