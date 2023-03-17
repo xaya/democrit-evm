@@ -8,47 +8,44 @@ const utils = require ("./testutils");
 const AccountHolderTestHelper = artifacts.require ("AccountHolderTestHelper");
 
 contract ("AccountHolder", accounts => {
-  let wchiSupply = accounts[0];
+  let addr = accounts[0];
 
   let wchi, acc, del, ah;
   beforeEach (async () => {
-    ({wchi, acc, del} = await utils.xayaEnvironment (wchiSupply));
+    ({wchi, acc, del} = await utils.xayaEnvironment (addr));
     ah = await AccountHolderTestHelper.new (del.address);
 
     /* Approve WCHI from the main account, so it can register names.  */
-    await wchi.approve (acc.address, utils.maxUint256, {from: wchiSupply});
+    await wchi.approve (acc.address, utils.maxUint256, {from: addr});
 
     /* Transfer some WCHI to the AccountHolder, so it can actually
        pay for moves.  */
-    await wchi.transfer (ah.address, 1000000, {from: wchiSupply});
+    await wchi.transfer (ah.address, 1000000, {from: addr});
   });
 
   it ("rejects unexpected NFT transfers", async () => {
-    const env2 = await utils.xayaEnvironment (wchiSupply);
+    const env2 = await utils.xayaEnvironment (addr);
     const acc2 = env2.acc;
 
     const tokenId1 = await acc.tokenIdForName ("g", "x");
-    await acc.register ("g", "x", {from: wchiSupply});
+    await acc.register ("g", "x", {from: addr});
     const tokenId2 = await acc2.tokenIdForName ("p", "y");
-    await acc2.register ("p", "y", {from: wchiSupply});
+    await acc2.register ("p", "y", {from: addr});
 
     await truffleAssert.reverts (
-        acc.safeTransferFrom (wchiSupply, ah.address, tokenId1,
-                              {from: wchiSupply}),
+        acc.safeTransferFrom (addr, ah.address, tokenId1, {from: addr}),
         "only Xaya accounts");
     await truffleAssert.reverts (
-        acc2.safeTransferFrom (wchiSupply, ah.address, tokenId2,
-                               {from: wchiSupply}),
+        acc2.safeTransferFrom (addr, ah.address, tokenId2, {from: addr}),
         "only Xaya names");
   });
 
   it ("can be initialised correctly", async () => {
     const tokenId = await acc.tokenIdForName ("p", "foo");
-    await acc.register ("p", "foo", {from: wchiSupply});
+    await acc.register ("p", "foo", {from: addr});
 
     assert.isFalse (await ah.initialised ());
-    await acc.safeTransferFrom (wchiSupply, ah.address, tokenId,
-                                {from: wchiSupply});
+    await acc.safeTransferFrom (addr, ah.address, tokenId, {from: addr});
 
     assert.isTrue (await ah.initialised ());
     assert.equal (await ah.account (), "foo");
@@ -56,13 +53,12 @@ contract ("AccountHolder", accounts => {
 
   it ("can only be initialised once", async () => {
     const tokenId = await acc.tokenIdForName ("p", "wrong");
-    await acc.register ("p", "wrong", {from: wchiSupply});
+    await acc.register ("p", "wrong", {from: addr});
 
-    await utils.initialiseContract (acc, wchiSupply, "right", ah);
+    await utils.initialiseContract (ah, addr, "right");
 
     await truffleAssert.reverts (
-        acc.safeTransferFrom (wchiSupply, ah.address, tokenId,
-                              {from: wchiSupply}),
+        acc.safeTransferFrom (addr, ah.address, tokenId, {from: addr}),
         "already initialised");
     assert.equal (await ah.account (), "right");
   });
@@ -71,18 +67,23 @@ contract ("AccountHolder", accounts => {
     await truffleAssert.reverts (
         ah.sendMoveFromTest ("move"),
         "is not initialised");
-    await utils.initialiseContract (acc, wchiSupply, "foo", ah);
+    await utils.initialiseContract (ah, addr, "foo");
 
-    await ah.sendMoveFromTest ("some");
-    await ah.sendMoveFromTest ("moves");
+    await ah.sendMoveFromTest ("\"some\"");
+    await ah.sendMoveFromTest ("\"moves\"");
 
     const moves = await acc.getPastEvents ("Move",
                                            {fromBlock: 0, toBlock: "latest"});
     assert.equal (moves.length, 2);
     assert.equal (moves[0].args.ns, "p");
     assert.equal (moves[0].args.name, "foo");
-    assert.equal (moves[0].args.mv, "some");
-    assert.equal (moves[1].args.mv, "moves");
+    assert.equal (moves[0].args.mv, "\"some\"");
+    assert.equal (moves[1].args.mv, "\"moves\"");
+
+    assert.deepEqual (await utils.getMoves (acc, 0), [
+        ["foo", "some"],
+        ["foo", "moves"],
+    ]);
   });
 
 });

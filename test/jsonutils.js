@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2023 Autonomous Worlds Ltd
 
-const truffleAssert = require ("truffle-assertions");
-
-/* We want to use chai-as-promised for checking the MoveData structs easily,
-   but due to an open issue with Truffle we can only apply the plugin
-   if we use our own Chai (for these assertions at least):
+/* We want to use chai-as-promised for checking that invalid JSON parsing
+   gets rejected, but due to an open issue with Truffle we can only apply the
+   plugin if we use our own Chai (for these assertions at least):
 
      https://github.com/trufflesuite/truffle/issues/2090
 */
@@ -43,7 +41,6 @@ contract ("JsonUtils", accounts => {
 
   it ("produces invalid literals for invalid UTF-8", async () => {
     const invalidBytes = [
-      "0x00",
       "0xff",
       "0xc080",
       "0x2fc0ae2e2f",

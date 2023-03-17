@@ -46,8 +46,10 @@ async function xayaEnvironment (deployer)
  * Initialises the contract (which is an AccountHolder or a subcontract)
  * by registering the given name and transferring it to it.
  */
-async function initialiseContract (acc, fromAccount, name, contract)
+async function initialiseContract (contract, fromAccount, name)
 {
+  const acc = await XayaAccounts.at (await contract.accountRegistry ());
+
   const tokenId = await acc.tokenIdForName ("p", name);
   await acc.register ("p", name, {from: fromAccount});
   await acc.safeTransferFrom (fromAccount, contract.address, tokenId,
@@ -55,9 +57,26 @@ async function initialiseContract (acc, fromAccount, name, contract)
   assert.isTrue (await contract.initialised ());
 }
 
+/**
+ * Returns the moves sent on the Xaya accounts registry since the given
+ * block height.
+ *
+ * Each entry returned will be an array of two elements, the name as string and
+ * the move as JSON.  Only events with namespace "p" will be returned.
+ */
+async function getMoves (acc, fromBlock)
+{
+  const moves = await acc.getPastEvents ("Move",
+                                         {fromBlock, toBlock: "latest"});
+  return moves
+      .filter (m => (m.args.ns == "p"))
+      .map (m => [m.args.name, JSON.parse (m.args.mv)]);
+}
+
 module.exports = {
   nullAddress,
   maxUint256,
   xayaEnvironment,
   initialiseContract,
+  getMoves,
 };
