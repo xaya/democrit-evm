@@ -58,6 +58,18 @@ async function initialiseContract (contract, fromAccount, name)
 }
 
 /**
+ * Transfers some WCHI from supply to the given address and approves
+ * WCHI on the accounts registry.  This is basically the setup required to
+ * register names with the given address.
+ */
+async function setupWchi (acc, supply, addr)
+{
+  const wchi = await WCHI.at (await acc.wchiToken ());
+  await wchi.transfer (addr, 1000000, {from: supply});
+  await wchi.approve (acc.address, maxUint256, {from: addr});
+}
+
+/**
  * Returns the moves sent on the Xaya accounts registry since the given
  * block height.
  *
@@ -116,6 +128,7 @@ module.exports = {
   maxUint256,
   xayaEnvironment,
   initialiseContract,
+  setupWchi,
   getMoves,
   createFounder,
   assertVault,

@@ -20,9 +20,7 @@ contract ("VaultManager", accounts => {
   beforeEach (async () => {
     ({wchi, acc, del} = await utils.xayaEnvironment (addr));
     vm = await VaultManagerTestHelper.new (del.address, tc.address);
-
-    /* Set up WCHI and approvals so we can send moves properly.  */
-    await wchi.approve (acc.address, utils.maxUint256, {from: addr});
+    await utils.setupWchi (acc, addr, addr);
     await wchi.transfer (vm.address, 1000000, {from: addr});
 
     await utils.initialiseContract (vm, addr, "ctrl");
@@ -114,6 +112,38 @@ contract ("VaultManager", accounts => {
     await truffleAssert.reverts (
         vm.send (1, "domob", 2, {from: addr}),
         "not enough funds");
+  });
+
+  it ("checks account permissions correctly", async () => {
+    const alice = accounts[1];
+    const bob = accounts[2];
+    const charlie = accounts[3];
+
+    const tokenId = await acc.tokenIdForName ("p", "abc");
+    await acc.register ("p", "abc", {from: addr});
+    await acc.setApprovalForAll (alice, true, {from: addr});
+    await acc.approve (bob, tokenId, {from: addr});
+
+    await utils.setupWchi (acc, addr, charlie);
+    await acc.register ("g", "abc", {from: charlie});
+
+    assert.isTrue (await vm.hasAccountPermission (addr, "abc"));
+    assert.isTrue (await vm.hasAccountPermission (alice, "abc"));
+    assert.isTrue (await vm.hasAccountPermission (bob, "abc"));
+    assert.isFalse (await vm.hasAccountPermission (charlie, "abc"));
+  });
+
+  it ("returns account ownership", async () => {
+    const alice = accounts[1];
+    const bob = accounts[2];
+
+    await utils.setupWchi (acc, addr, alice);
+    await utils.setupWchi (acc, addr, bob);
+
+    await acc.register ("p", "abc", {from: alice});
+    await acc.register ("g", "abc", {from: bob});
+
+    assert.equal (await vm.getAccountAddress ("abc"), alice);
   });
 
 });

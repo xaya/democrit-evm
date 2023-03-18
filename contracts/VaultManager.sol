@@ -164,6 +164,34 @@ contract VaultManager is AccountHolder
   }
 
   /**
+   * @dev Checks if the given address is the owner or authorised for
+   * the account name specified.  This is a helper method that is used to
+   * verify the link between (mostly) _msgSender() and accounts from Democrit,
+   * since accounts are the main entities used for ownership of vaults
+   * and orders.
+   */
+  function hasAccountPermission (address operator, string memory name)
+      public view returns (bool)
+  {
+    uint256 tokenId = accountRegistry.tokenIdForName ("p", name);
+    address owner = accountRegistry.ownerOf (tokenId);
+    return operator == owner
+        || accountRegistry.isApprovedForAll (owner, operator)
+        || accountRegistry.getApproved (tokenId) == operator;
+  }
+
+  /**
+   * @dev Returns the current owner of the given account name.  This is
+   * a helper method used by Democrit.  The owner is for instance who
+   * receives ERC-20 tokens when a limit sell order is executed.
+   */
+  function getAccountAddress (string memory name)
+      public view returns (address)
+  {
+    return accountRegistry.ownerOf (accountRegistry.tokenIdForName ("p", name));
+  }
+
+  /**
    * @dev Sends a move with the owned account, wrapping it into
    * {"g":{"game id": ... }} for the config's game ID.
    */

@@ -14,9 +14,7 @@ contract ("AccountHolder", accounts => {
   beforeEach (async () => {
     ({wchi, acc, del} = await utils.xayaEnvironment (addr));
     ah = await AccountHolderTestHelper.new (del.address);
-
-    /* Approve WCHI from the main account, so it can register names.  */
-    await wchi.approve (acc.address, utils.maxUint256, {from: addr});
+    await utils.setupWchi (acc, addr, addr);
 
     /* Transfer some WCHI to the AccountHolder, so it can actually
        pay for moves.  */
