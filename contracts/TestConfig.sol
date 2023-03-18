@@ -41,6 +41,16 @@ contract TestConfig is IDemocritConfig
     ));
   }
 
+  function checkpointMove (string memory controller, uint num, bytes32 hash)
+      public pure returns (string memory)
+  {
+    return string (abi.encodePacked (
+        "{\"checkpoint\": \"", Strings.toString (num), " ",
+        Strings.toHexString (uint256 (hash)),
+        " from ", controller, "\"}"
+    ));
+  }
+
   function sendFromVaultMove (string memory controller, uint vaultId,
                               string memory recipient,
                               string memory asset, uint amount)

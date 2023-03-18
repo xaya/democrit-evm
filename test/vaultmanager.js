@@ -27,13 +27,26 @@ contract ("VaultManager", accounts => {
     await utils.createFounder (vm, addr, "founder");
   });
 
+  /**
+   * Helper function to return the number of checkpoints created.
+   * We use this to test the situations where we expect that the
+   * auto-checkpointing works as it should.
+   */
+  async function getNumCheckpoints ()
+  {
+    const events
+        = await vm.getPastEvents ("CheckpointCreated",
+                                  {fromBlock: 0, toBlock: "latest"});
+    return events.length;
+  }
+
   it ("returns no vault for out-of-index", async () => {
     await utils.assertNoVault (vm, 100);
   });
 
   it ("sends moves for creating vaults correctly", async () => {
     await vm.create ("founder", "gold", 200, {from: addr});
-    assert.deepEqual (await utils.getMoves (acc, 0), [
+    assert.deepEqual (utils.ignoreCheckpoints (await utils.getMoves (acc, 0)), [
       ["ctrl", {"g": {"gid": {
         "create": "ctrl:0 for 200 gold of founder"
       }}}],
@@ -70,7 +83,8 @@ contract ("VaultManager", accounts => {
     const afterCreate = await web3.eth.getBlockNumber () + 1;
     await vm.send (0, "domob", 10, {from: addr});
     await vm.send (1, "andy", 20, {from: addr});
-    assert.deepEqual (await utils.getMoves (acc, afterCreate), [
+    assert.deepEqual (
+      utils.ignoreCheckpoints (await utils.getMoves (acc, afterCreate)), [
       ["ctrl", {"g": {"gid": {
         "send": "10 gold from ctrl:0 to domob"
       }}}],
@@ -144,6 +158,63 @@ contract ("VaultManager", accounts => {
     await acc.register ("g", "abc", {from: bob});
 
     assert.equal (await vm.getAccountAddress ("abc"), alice);
+  });
+
+  it ("creates a checkpoint correctly", async () => {
+    await vm.create ("founder", "gold", 10, {from: addr});
+    const blk = await web3.eth.getBlock ("latest");
+
+    assert.equal (await getNumCheckpoints (), 0);
+    assert.isFalse (await vm.isCheckpoint (blk["hash"]));
+
+    await vm.maybeCreateCheckpoint ();
+    const blk2 = await web3.eth.getBlock ("latest");
+
+    assert.deepEqual (await utils.getMoves (acc, blk2["number"]), [
+      ["ctrl", {"g": {"gid": {
+        "checkpoint": blk["number"].toString () + " " + blk["hash"]
+                        + " from ctrl"
+      }}}],
+    ]);
+    assert.equal (await getNumCheckpoints (), 1);
+    assert.isTrue (await vm.isCheckpoint (blk["hash"]));
+    assert.isFalse (await vm.isCheckpoint (blk2["hash"]));
+  });
+
+  it ("creates checkpoints only when needed", async () => {
+    await vm.maybeCreateCheckpoint ();
+    assert.equal (await getNumCheckpoints (), 0);
+    await vm.create ("founder", "gold", 10, {from: addr});
+    assert.equal (await getNumCheckpoints (), 0);
+    await vm.maybeCreateCheckpoint ();
+    assert.equal (await getNumCheckpoints (), 1);
+    await vm.maybeCreateCheckpoint ();
+    assert.equal (await getNumCheckpoints (), 1);
+  });
+
+  it ("auto-checkpoints multiple operations in a block correctly", async () => {
+    await vm.create ("founder", "gold", 10, {from: addr});
+    assert.equal (await getNumCheckpoints (), 0);
+
+    /* Perform two creates after each other in the next block.  This will
+       checkpoint the vault created above, but only once, and also will not
+       attempt to checkpoint the newly created vault.  */
+    await vm.createMany ("founder", "silver", [5, 10]);
+    assert.equal (await getNumCheckpoints (), 1);
+
+    /* Perform a create and a spend-from-vault in the next block.  This
+       will checkpoint the previous block (with the two vaults created
+       there), but will not yet checkpoint the new one.  */
+    await vm.createAndSend ("founder", "copper", 10, "domob", 5);
+    assert.equal (await getNumCheckpoints (), 2);
+
+    /* Do a single send, which will checkpoint the previous block as well.
+       Then all checkpoints are done.  */
+    await vm.send (1, "domob", 1);
+    assert.equal (await getNumCheckpoints (), 3);
+
+    await vm.maybeCreateCheckpoint ();
+    assert.equal (await getNumCheckpoints (), 3);
   });
 
 });

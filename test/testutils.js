@@ -86,6 +86,17 @@ async function getMoves (acc, fromBlock)
 }
 
 /**
+ * Filters the array of moves provided (as from getMoves), removing
+ * all checkpoint moves.  They get auto-triggered during some otherwise
+ * unrelated things, and thus for some tests it helps to filter them out
+ * and concentrate on other things.
+ */
+function ignoreCheckpoints (moves)
+{
+  return moves.filter (m => !("checkpoint" in m[1]["g"]["gid"]));
+}
+
+/**
  * Registers a name (to be used as founder) with the required approvals set
  * up for the delegation contract.
  */
@@ -130,6 +141,7 @@ module.exports = {
   initialiseContract,
   setupWchi,
   getMoves,
+  ignoreCheckpoints,
   createFounder,
   assertVault,
   assertNoVault,

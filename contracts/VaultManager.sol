@@ -50,6 +50,19 @@ contract VaultManager is AccountHolder
   /** @dev All vaults by ID.  Emptied vaults will be deleted.  */
   VaultData[] private vaults;
 
+  /** @dev All checkpointed blocks we have seen in the contract.  */
+  mapping (bytes32 => bool) private checkpoints;
+
+  /**
+   * @dev The lowest block height of a vault that has been created but
+   * not yet checkpointed.  Creating vaults auto-triggers checkpointing
+   * if there are such vaults, so there will only be exactly one such block
+   * height anyway (if at all).  Because if another vault is created at a
+   * later height, it will trigger checkpointing of the vaults at the
+   * previous heights.  Zero if none such vaults exist.
+   */
+  uint public uncheckpointedHeight;
+
   /** @dev Emitted when a new vault is created and funded.  */
   event VaultCreated (string controller, uint id, string founder,
                       string asset, uint initialBalance);
@@ -63,6 +76,9 @@ contract VaultManager is AccountHolder
 
   /** @dev Emitted when an empty vault gets removed.  */
   event VaultEmptied (string controller, uint id);
+
+  /** @dev Emitted when a block hash is checkpointed.  */
+  event CheckpointCreated (bytes32 hash);
 
   constructor (XayaDelegation del, IDemocritConfig cfg)
     AccountHolder(del)
@@ -106,6 +122,11 @@ contract VaultManager is AccountHolder
     require (config.isTradableAsset (asset), "invalid asset for vault");
     require (initialBalance > 0, "initial balance must be positive");
 
+    /* Trigger automatic checkpointing, and afterwards mark the current height
+       as having a new vault.  */
+    maybeCreateCheckpoint ();
+    uncheckpointedHeight = block.number;
+
     uint vaultId = vaults.length;
     VaultData storage data = vaults.push ();
     data.founder = founder;
@@ -143,6 +164,10 @@ contract VaultManager is AccountHolder
 
     VaultData memory data = vaults[vaultId];
     require (data.balance >= amount, "not enough funds in vault");
+
+    /* Trigger automatic checkpointing after the most basic checks
+       (so we don't waste gas in case those revert).  */
+    maybeCreateCheckpoint ();
 
     string memory mv
         = config.sendFromVaultMove (account, vaultId, recipient,
@@ -189,6 +214,40 @@ contract VaultManager is AccountHolder
       public view returns (address)
   {
     return accountRegistry.ownerOf (accountRegistry.tokenIdForName ("p", name));
+  }
+
+  /**
+   * @dev Returns true if the given block hash is known as checkpoint.
+   */
+  function isCheckpoint (bytes32 hash) public view returns (bool)
+  {
+    return checkpoints[hash];
+  }
+
+  /**
+   * @dev If there are any uncheckpointed vaults, trigger a checkpoint.
+   * Note that creating a checkpoint is not security critical, so this
+   * is a method that anyone is allowed to call any time they want, if
+   * they are willing to pay for the gas.  The only thing perhaps bad that
+   * could happen is that it triggers a move and the move costs the contract
+   * WCHI; but also that will only ever be the case if there are actually
+   * vaults to checkpoint, in which case the move is reasonable, and this
+   * behaviour cannot be spammed either.
+   */
+  function maybeCreateCheckpoint () public
+  {
+    uint h = uncheckpointedHeight;
+    if (h == 0 || h >= block.number)
+      return;
+
+    uint num = block.number - 1;
+    bytes32 cpHash = blockhash (num);
+
+    sendGameMove (config.checkpointMove (account, num, cpHash));
+    checkpoints[cpHash] = true;
+
+    uncheckpointedHeight = 0;
+    emit CheckpointCreated (cpHash);
   }
 
   /**

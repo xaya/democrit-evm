@@ -29,4 +29,30 @@ contract VaultManagerTestHelper is VaultManager
     sendFromVault (vaultId, recipient, amount);
   }
 
+  /**
+   * @dev Creates multiple vaults in the same transaction.  With this we can
+   * test a situation where two creates are in the same block.
+   */
+  function createMany (string memory founder, string memory asset,
+                       uint[] calldata ib)
+      public
+  {
+    for (uint i = 0; i < ib.length; ++i)
+      createVault (founder, asset, ib[i]);
+  }
+
+  /**
+   * @dev Executes a vault creation and send in the same transaction.  This is
+   * used to test checkpointing in the case that those two appear within a
+   * single block.
+   */
+  function createAndSend (string memory founder, string memory asset,
+                          uint initialBalance,
+                          string memory recipient, uint amount)
+      public
+  {
+    uint vaultId = createVault (founder, asset, initialBalance);
+    sendFromVault (vaultId, recipient, amount);
+  }
+
 }

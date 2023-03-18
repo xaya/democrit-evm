@@ -50,6 +50,14 @@ interface IDemocritConfig
       external view returns (string memory);
 
   /**
+   * @dev Returns the move for requesting a checkpoint.  The returned move
+   * should be a JSON string.  The caller will wrap it into
+   * {"g":{"game id": ... }}.
+   */
+  function checkpointMove (string memory controller, uint num, bytes32 hash)
+      external view returns (string memory);
+
+  /**
    * @dev Returns the move for funding a vault, which is sent from the
    * founding user (not the controller) after a vault has been created.
    * This is sent through the delegation contract, so it should return
