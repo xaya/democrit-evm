@@ -84,16 +84,25 @@ contract VaultManager is AccountHolder
     AccountHolder(del)
   {
     config = cfg;
+
+    /* We want vault IDs to start at 1, so that a zero ID can be taken
+       to mean some entry does not exist.  Thus we add an empty vault at
+       index zero.  */
+    vaults.push ();
   }
 
   /**
    * @dev Returns the number of vaults that have been created (even if some
-   * of them might have been emptied in the mean time).  This is also the
-   * next ID given to a new vault.
+   * of them might have been emptied in the mean time).
+   *
+   * This can also be used to predict the next vault ID given out, which
+   * will be getNumVaults() + 1.
    */
   function getNumVaults () public view returns (uint)
   {
-    return vaults.length;
+    /* The vault at index zero is a dummy one created in the constructor
+       and empty right away, we do not want to count it here.  */
+    return vaults.length - 1;
   }
 
   /**

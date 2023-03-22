@@ -44,14 +44,19 @@ contract ("VaultManager", accounts => {
     await utils.assertNoVault (vm, 100);
   });
 
+  it ("has no index zero vault", async () => {
+    await vm.create ("founder", "gold", 100, {from: addr});
+    await utils.assertNoVault (vm, 0);
+  });
+
   it ("sends moves for creating vaults correctly", async () => {
     await vm.create ("founder", "gold", 200, {from: addr});
     assert.deepEqual (utils.ignoreCheckpoints (await utils.getMoves (acc, 0)), [
       ["ctrl", {"g": {"gid": {
-        "create": "ctrl:0 for 200 gold of founder"
+        "create": "ctrl:1 for 200 gold of founder"
       }}}],
       ["founder", {"g": {"gid": {
-        "fund": {"ctrl:0": "with 200 gold by founder"}
+        "fund": {"ctrl:1": "with 200 gold by founder"}
       }}}],
     ]);
   });
@@ -61,8 +66,8 @@ contract ("VaultManager", accounts => {
     await vm.create ("founder", "silver", 20, {from: addr});
 
     assert.equal (await vm.getNumVaults (), 2);
-    utils.assertVault (vm, 0, "founder", "gold", 10);
-    utils.assertVault (vm, 1, "founder", "silver", 20);
+    utils.assertVault (vm, 1, "founder", "gold", 10);
+    utils.assertVault (vm, 2, "founder", "silver", 20);
   });
 
   it ("does not allow untradable assets", async () => {
@@ -81,15 +86,15 @@ contract ("VaultManager", accounts => {
     await vm.create ("founder", "gold", 100, {from: addr});
     await vm.create ("founder", "silver", 100, {from: addr});
     const afterCreate = await web3.eth.getBlockNumber () + 1;
-    await vm.send (0, "domob", 10, {from: addr});
-    await vm.send (1, "andy", 20, {from: addr});
+    await vm.send (1, "domob", 10, {from: addr});
+    await vm.send (2, "andy", 20, {from: addr});
     assert.deepEqual (
       utils.ignoreCheckpoints (await utils.getMoves (acc, afterCreate)), [
       ["ctrl", {"g": {"gid": {
-        "send": "10 gold from ctrl:0 to domob"
+        "send": "10 gold from ctrl:1 to domob"
       }}}],
       ["ctrl", {"g": {"gid": {
-        "send": "20 silver from ctrl:1 to andy"
+        "send": "20 silver from ctrl:2 to andy"
       }}}],
     ]);
   });
@@ -98,12 +103,12 @@ contract ("VaultManager", accounts => {
     await vm.create ("founder", "gold", 100, {from: addr});
     await vm.create ("founder", "silver", 100, {from: addr});
 
-    await vm.send (0, "domob", 50, {from: addr});
-    await vm.send (1, "andy", 20, {from: addr});
-    await vm.send (0, "andy", 50, {from: addr});
+    await vm.send (1, "domob", 50, {from: addr});
+    await vm.send (2, "andy", 20, {from: addr});
+    await vm.send (1, "andy", 50, {from: addr});
 
-    utils.assertNoVault (vm, 0);
-    utils.assertVault (vm, 1, "founder", "silver", 80);
+    utils.assertNoVault (vm, 1);
+    utils.assertVault (vm, 2, "founder", "silver", 80);
   });
 
   it ("fails when sending more from a vault than exists", async () => {
@@ -111,20 +116,20 @@ contract ("VaultManager", accounts => {
     await vm.create ("founder", "silver", 100, {from: addr});
 
     await truffleAssert.reverts (
-        vm.send (0, "domob", 0, {from: addr}),
+        vm.send (1, "domob", 0, {from: addr}),
         "trying to send zero amount");
     await truffleAssert.reverts (
         vm.send (100, "domob", 1, {from: addr}),
         "revert");
 
-    await vm.send (0, "domob", 100, {from: addr});
-    await vm.send (1, "domob", 99, {from: addr});
+    await vm.send (1, "domob", 100, {from: addr});
+    await vm.send (2, "domob", 99, {from: addr});
 
     await truffleAssert.reverts (
-        vm.send (0, "domob", 1, {from: addr}),
+        vm.send (1, "domob", 1, {from: addr}),
         "not enough funds");
     await truffleAssert.reverts (
-        vm.send (1, "domob", 2, {from: addr}),
+        vm.send (2, "domob", 2, {from: addr}),
         "not enough funds");
   });
 
@@ -210,7 +215,7 @@ contract ("VaultManager", accounts => {
 
     /* Do a single send, which will checkpoint the previous block as well.
        Then all checkpoints are done.  */
-    await vm.send (1, "domob", 1);
+    await vm.send (2, "domob", 1);
     assert.equal (await getNumCheckpoints (), 3);
 
     await vm.maybeCreateCheckpoint ();
