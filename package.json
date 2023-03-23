@@ -1,4 +1,19 @@
 {
+  "name": "@xaya/democrit-evm",
+  "version": "0.1.0",
+  "description": "Smart contract component for the Democrit protocol.",
+  "author": "Daniel Kraft <daniel@xaya.io>",
+  "license": "MIT",
+  "homepage": "https://github.com/xaya/democrit-evm",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xaya/democrit-evm.git"
+  },
+  "files": [
+    "/contracts/*.sol",
+    "/build/contracts/*.json",
+    "README.md"
+  ],
   "dependencies": {
     "@openzeppelin/contracts": "4.8.0",
     "@xaya/eth-account-registry": "1.0.0",
