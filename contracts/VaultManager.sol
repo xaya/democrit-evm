@@ -94,15 +94,20 @@ contract VaultManager is AccountHolder
   /**
    * @dev Returns the number of vaults that have been created (even if some
    * of them might have been emptied in the mean time).
-   *
-   * This can also be used to predict the next vault ID given out, which
-   * will be getNumVaults() + 1.
    */
   function getNumVaults () public view returns (uint)
   {
     /* The vault at index zero is a dummy one created in the constructor
        and empty right away, we do not want to count it here.  */
     return vaults.length - 1;
+  }
+
+  /**
+   * @dev Returns the ID given to the next created vault.
+   */
+  function getNextVaultId () public view returns (uint)
+  {
+    return vaults.length;
   }
 
   /**
@@ -136,7 +141,7 @@ contract VaultManager is AccountHolder
     maybeCreateCheckpoint ();
     uncheckpointedHeight = block.number;
 
-    uint vaultId = vaults.length;
+    uint vaultId = getNextVaultId ();
     VaultData storage data = vaults.push ();
     data.founder = founder;
     data.asset = asset;

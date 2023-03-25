@@ -66,6 +66,7 @@ contract ("VaultManager", accounts => {
     await vm.create ("founder", "silver", 20, {from: addr});
 
     assert.equal (await vm.getNumVaults (), 2);
+    assert.equal (await vm.getNextVaultId (), 3);
     utils.assertVault (vm, 1, "founder", "gold", 10);
     utils.assertVault (vm, 2, "founder", "silver", 20);
   });
