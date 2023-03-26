@@ -62,6 +62,7 @@ library JsonUtils
               out[len++] = escape[i];
           }
       }
+    assert (offset == data.length);
 
     out[len++] = '"';
 
