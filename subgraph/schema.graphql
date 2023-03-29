@@ -1,0 +1,46 @@
+# GraphQL schema for the Democrit data
+
+# A trade that has (presumably) happened on Democrit.
+type Trade @entity (immutable: true) {
+  "The ID of a trade is just a sequentially-generated integer for all trades."
+  id: String!
+  timestamp: BigInt!
+  asset: String!
+  amount: BigInt!
+  sats: BigInt!
+  "Price in sats per asset unit."
+  price: BigDecimal!
+  seller: String!
+  buyer: String!
+}
+
+# A vault that is currently existing and not yet emptied.  Only vaults
+# controlled by the contract are considered.
+type Vault @entity {
+  "The vaultId field.  The controller is always the contract's account."
+  id: String!
+  founder: String!
+  asset: String!
+  balance: BigInt!
+
+  "The associated SellOrder, if this vault corresponds to one."
+  sellOrder: SellOrder
+}
+
+# A currently active limit sell order in the book.
+type SellOrder @entity {
+  id: String!
+  vault: Vault!
+  seller: String!
+  asset: String!
+  amount: BigInt!
+  totalSats: BigInt!
+  price: BigDecimal!
+}
+
+# A helper table, which records the next ID to give out to trades.
+type AutoId @entity {
+  "A string identifying the sequence (e.g. Trade)."
+  id: String!
+  next: BigInt!
+}
