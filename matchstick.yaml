@@ -1,0 +1,7 @@
+# Configuration file for the subgraph tests in the subgraph folder.
+# Due to node_modules being in the root of the repository, we need
+# to run "graph test" from here as well.  This config file makes sure
+# it finds the things needed when doing so.
+
+testsFolder: subgraph/tests
+manifestPath: subgraph/subgraph.yaml
