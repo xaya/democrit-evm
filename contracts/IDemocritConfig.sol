@@ -25,6 +25,18 @@ interface IDemocritConfig
   function gameId () external view returns (string memory);
 
   /**
+   * @dev The denominator amount used for specifying the pool fee fraction.
+   */
+  function feeDenominator () external view returns (uint64);
+
+  /**
+   * @dev The maximum allowed relative fee for a trading pool.  This is
+   * enforced on chain to prevent scams with very abusive fees.  The value
+   * is relative to feeDenominator.
+   */
+  function maxRelPoolFee () external view returns (uint64);
+
+  /**
    * @dev Checks if the given asset is tradable.
    */
   function isTradableAsset (string memory asset) external view returns (bool);

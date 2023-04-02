@@ -16,6 +16,10 @@ contract TestConfig is IDemocritConfig
 
   string public constant gameId = "gid";
 
+  /* For the test, we set up fees as simple percent.  */
+  uint64 public constant feeDenominator = 100;
+  uint64 public constant maxRelPoolFee = 10;
+
   /* We support three test assets, gold, silver and copper.  These
      are the pre-computed hashes of those strings.  */
   bytes32 private constant HASH_GOLD = keccak256 ("gold");

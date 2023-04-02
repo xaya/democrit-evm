@@ -90,6 +90,17 @@ async function createFounder (vm, fromAccount, name)
 }
 
 /**
+ * Sets up things for a pool operator account with the given address and name.
+ */
+async function setupPoolOperator (dem, chiSupply, addr, name)
+{
+  const vm = await VaultManager.at (await dem.vm ());
+  const acc = await XayaAccounts.at (await vm.accountRegistry ());
+  await setupWchi (acc, chiSupply, addr);
+  await createFounder (vm, addr, name);
+}
+
+/**
  * Sets up the testing environment we use for "full trading" tests.
  * This deploys a DemocritTestHelper instance in addition to the basic
  * Xaya contracts, and sets up a buyer and seller account.  The buyer
@@ -234,6 +245,7 @@ module.exports = {
   initialiseContract,
   setupWchi,
   createFounder,
+  setupPoolOperator,
   setupTradingTest,
   getMoves,
   getBestBlock,

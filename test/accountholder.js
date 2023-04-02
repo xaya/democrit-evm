@@ -8,7 +8,7 @@ const utils = require ("./testutils");
 const AccountHolderTestHelper = artifacts.require ("AccountHolderTestHelper");
 
 contract ("AccountHolder", accounts => {
-  let addr = accounts[0];
+  const addr = accounts[0];
 
   let wchi, acc, del, ah;
   beforeEach (async () => {

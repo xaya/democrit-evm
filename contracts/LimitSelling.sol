@@ -25,7 +25,6 @@ contract LimitSelling is Context
    */
   IERC20Metadata public immutable wchi;
 
-
   /**
    * @dev The data stored on chain for an active limit sell order.
    */

@@ -11,9 +11,9 @@ const TestConfig = artifacts.require ("TestConfig");
 const BALANCE = 1000000;
 
 contract ("Democrit", accounts => {
-  let supply = accounts[0];
-  let buyer = accounts[1];
-  let seller = accounts[2];
+  const supply = accounts[0];
+  const buyer = accounts[1];
+  const seller = accounts[2];
 
   let tc;
   before (async () => {

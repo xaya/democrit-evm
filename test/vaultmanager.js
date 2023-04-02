@@ -9,7 +9,7 @@ const VaultManagerTestHelper = artifacts.require ("VaultManagerTestHelper");
 const TestConfig = artifacts.require ("TestConfig");
 
 contract ("VaultManager", accounts => {
-  let addr = accounts[0];
+  const addr = accounts[0];
 
   let tc;
   before (async () => {
