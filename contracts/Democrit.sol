@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.19;
 
-import "./LimitSelling.sol";
+import "./LimitBuying.sol";
 import "./VaultManager.sol";
 
 /**
@@ -11,11 +11,11 @@ import "./VaultManager.sol";
  * functionality is inherited from parent contracts already and just
  * consolidated here.
  */
-contract Democrit is LimitSelling
+contract Democrit is LimitBuying
 {
 
   constructor (VaultManager v)
-    LimitSelling(v)
+    LimitBuying(v)
   {}
 
   /**
