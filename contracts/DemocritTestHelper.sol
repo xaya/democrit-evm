@@ -3,16 +3,16 @@
 
 pragma solidity ^0.8.19;
 
-import "./LimitSelling.sol";
+import "./Democrit.sol";
 
 /**
- * @dev Helper subcontract of LimitSelling, which does some tweaks for testing.
+ * @dev Helper subcontract of Democrit, which does some tweaks for testing.
  */
-contract LimitSellingTestHelper is LimitSelling
+contract DemocritTestHelper is Democrit
 {
 
   constructor (XayaDelegation del, IDemocritConfig cfg, uint firstId)
-    LimitSelling(del, cfg)
+    Democrit(del, cfg)
   {
     /* In tests, we start with a higher order ID.  This ensures that
        order IDs do not match the associated vault IDs, which could lead

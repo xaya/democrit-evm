@@ -21,6 +21,8 @@ const delegatorData
 const XayaDelegation = truffleContract (delegatorData);
 XayaDelegation.setProvider (web3.currentProvider);
 
+const DemocritTestHelper = artifacts.require ("DemocritTestHelper");
+
 const nullAddress = "0x0000000000000000000000000000000000000000";
 const maxUint256 = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
 
@@ -70,6 +72,52 @@ async function setupWchi (acc, supply, addr)
 }
 
 /**
+ * Registers a name (to be used as founder) with the required approvals set
+ * up for the delegation contract.
+ */
+async function createFounder (vm, fromAccount, name)
+{
+  const del = await XayaDelegation.at (await vm.delegator ());
+  const acc = await XayaAccounts.at (await vm.accountRegistry ());
+
+  await acc.register ("p", name, {from: fromAccount});
+  await acc.setApprovalForAll (del.address, true, {from: fromAccount});
+  await del.grant ("p", name, ["g"], vm.address, maxUint256, false,
+                   {from: fromAccount});
+}
+
+/**
+ * Sets up the testing environment we use for "full trading" tests.
+ * This deploys a DemocritTestHelper instance in addition to the basic
+ * Xaya contracts, and sets up a buyer and seller account.  The buyer
+ * has a given initial balance of WCHI, and the seller owns a founder
+ * name "seller".
+ */
+async function setupTradingTest (testConfig, supply, buyer, seller, balance)
+{
+  const {wchi, acc, del} = await xayaEnvironment (supply);
+  const dem = await DemocritTestHelper.new (
+      del.address, testConfig.address, 101);
+  await setupWchi (acc, supply, supply);
+  await initialiseContract (dem, supply, "ctrl");
+  await wchi.transfer (dem.address, 1000000, {from: supply});
+
+  /* We set up the buyer with a fixed initial balance of WCHI and the seller
+     without any, but configured with a founder name "seller".  */
+  await setupWchi (acc, supply, buyer);
+  await setupWchi (acc, supply, seller);
+  await createFounder (dem, seller, "seller");
+  await wchi.transfer (supply, await wchi.balanceOf (seller), {from: seller});
+  await wchi.transfer (buyer, balance - (await wchi.balanceOf (buyer)),
+                       {from: supply});
+  assert.equal (await wchi.balanceOf (seller), 0);
+  assert.equal (await wchi.balanceOf (buyer), balance);
+  await wchi.approve (dem.address, maxUint256, {from: buyer});
+
+  return {wchi, acc, del, dem};
+}
+
+/**
  * Returns the moves sent on the Xaya accounts registry since the given
  * block height.
  *
@@ -94,21 +142,6 @@ async function getMoves (acc, fromBlock)
 function ignoreCheckpoints (moves)
 {
   return moves.filter (m => !("checkpoint" in m[1]["g"]["gid"]));
-}
-
-/**
- * Registers a name (to be used as founder) with the required approvals set
- * up for the delegation contract.
- */
-async function createFounder (vm, fromAccount, name)
-{
-  const del = await XayaDelegation.at (await vm.delegator ());
-  const acc = await XayaAccounts.at (await vm.accountRegistry ());
-
-  await acc.register ("p", name, {from: fromAccount});
-  await acc.setApprovalForAll (del.address, true, {from: fromAccount});
-  await del.grant ("p", name, ["g"], vm.address, maxUint256, false,
-                   {from: fromAccount});
 }
 
 /**
@@ -140,9 +173,10 @@ module.exports = {
   xayaEnvironment,
   initialiseContract,
   setupWchi,
+  createFounder,
+  setupTradingTest,
   getMoves,
   ignoreCheckpoints,
-  createFounder,
   assertVault,
   assertNoVault,
 };
