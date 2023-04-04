@@ -28,6 +28,14 @@ contract LimitSelling is VaultManager, Context
     uint vaultId;
 
     /**
+     * @dev The address which owned the vault's founder name at creation
+     * time.  The order is only valid to take when it still is the owner,
+     * to prevent potential attacks with creating orders and
+     * transferring/selling the name.
+     */
+    address creator;
+
+    /**
      * @dev The amount in WCHI sats required to buy out the entire vault's
      * remaining balance.  This implies the limit price by proportion.
      */
@@ -49,8 +57,11 @@ contract LimitSelling is VaultManager, Context
     /** @dev The vault ID associated to it.  */
     uint vaultId;
 
-    /** @dev The owner / seller account.  */
-    string owner;
+    /** @dev The owner address at creation time.  */
+    address creator;
+
+    /** @dev The seller account.  */
+    string seller;
 
     /** @dev The asset being sold.  */
     string asset;
@@ -73,7 +84,7 @@ contract LimitSelling is VaultManager, Context
   mapping (uint => SellOrder) private sellOrders;
 
   /** @dev Emitted when a new sell order is created.  */
-  event SellOrderCreated (uint orderId, uint vaultId,
+  event SellOrderCreated (uint orderId, uint vaultId, address creator,
                           string seller, string asset,
                           uint amount, uint totalSats);
   /**
@@ -156,8 +167,9 @@ contract LimitSelling is VaultManager, Context
     return CompleteSellOrder ({
       orderId: orderId,
       vaultId: vaultId,
+      creator: data.creator,
       totalSats: data.totalSats,
-      owner: vault.founder,
+      seller: vault.founder,
       asset: vault.asset,
       remainingAmount: vault.balance
     });
@@ -179,12 +191,15 @@ contract LimitSelling is VaultManager, Context
     uint vaultId = createVault (seller, asset, amount);
     assert (vaultId > 0);
     uint orderId = nextOrderId++;
+    address creator = getAccountAddress (seller);
 
     sellOrders[orderId] = SellOrder ({
       vaultId: vaultId,
+      creator: creator,
       totalSats: totalSats
     });
-    emit SellOrderCreated (orderId, vaultId, seller, asset, amount, totalSats);
+    emit SellOrderCreated (orderId, vaultId, creator, seller,
+                           asset, amount, totalSats);
 
     return orderId;
   }
@@ -197,10 +212,10 @@ contract LimitSelling is VaultManager, Context
   {
     CompleteSellOrder memory data = getSellOrder (orderId);
     require (data.orderId == orderId, "order does not exist");
-    require (hasAccountPermission (_msgSender (), data.owner),
+    require (hasAccountPermission (_msgSender (), data.seller),
              "no permission to act on behalf of the seller account");
 
-    sendFromVault (data.vaultId, data.owner, data.remainingAmount);
+    sendFromVault (data.vaultId, data.seller, data.remainingAmount);
     delete sellOrders[orderId];
     emit SellOrderRemoved (orderId);
   }
@@ -252,12 +267,14 @@ contract LimitSelling is VaultManager, Context
     uint sats = getSatsForPurchase (data.remainingAmount, data.totalSats,
                                     args.amountBought);
 
-    address sellerAddress = getAccountAddress (data.owner);
+    address sellerAddress = getAccountAddress (data.seller);
+    require (sellerAddress == data.creator, "seller name has been transferred");
+
     require (wchi.transferFrom (_msgSender (), sellerAddress, sats),
              "WCHI transfer failed");
     sendFromVault (data.vaultId, args.buyer, args.amountBought);
 
-    emit Trade (data.asset, args.amountBought, sats, data.owner, args.buyer);
+    emit Trade (data.asset, args.amountBought, sats, data.seller, args.buyer);
     if (args.amountBought == data.remainingAmount)
       {
         delete sellOrders[data.orderId];

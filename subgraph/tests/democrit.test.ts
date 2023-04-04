@@ -7,6 +7,8 @@ import {
 } from "matchstick-as/assembly/index"
 
 import {
+  ADDRESS1,
+  ADDRESS2,
   testTrade,
   testVaultCreated,
   testVaultChanged,
@@ -74,15 +76,17 @@ describe ("Vaults", () => {
 
 describe ("SellOrders", () => {
   test ("Creation", () => {
-    testSellOrderCreated (10, 110, "seller", "gold", 10, 200)
-    testSellOrderCreated (20, 120, "seller", "silver", 100, 50)
+    testSellOrderCreated (10, 110, ADDRESS1, "seller", "gold", 10, 200)
+    testSellOrderCreated (20, 120, ADDRESS2, "seller", "silver", 100, 50)
 
+    assert.fieldEquals ("SellOrder", "10", "creator", ADDRESS1.toHexString ())
     assert.fieldEquals ("SellOrder", "10", "seller", "seller")
     assert.fieldEquals ("SellOrder", "10", "asset", "gold")
     assert.fieldEquals ("SellOrder", "10", "amount", "10")
     assert.fieldEquals ("SellOrder", "10", "totalSats", "200")
     assert.fieldEquals ("SellOrder", "10", "price", "20")
 
+    assert.fieldEquals ("SellOrder", "20", "creator", ADDRESS2.toHexString ())
     assert.fieldEquals ("SellOrder", "20", "asset", "silver")
     assert.fieldEquals ("SellOrder", "20", "amount", "100")
     assert.fieldEquals ("SellOrder", "20", "totalSats", "50")
@@ -91,14 +95,14 @@ describe ("SellOrders", () => {
 
   test ("Link to vault", () => {
     testVaultCreated (101, "domob", "gold", 10)
-    testSellOrderCreated (1, 101, "domob", "gold", 10, 50)
+    testSellOrderCreated (1, 101, ADDRESS1, "domob", "gold", 10, 50)
 
     assert.fieldEquals ("Vault", "101", "sellOrder", "1")
     assert.fieldEquals ("SellOrder", "1", "vault", "101")
   })
 
   test ("Update", () => {
-    testSellOrderCreated (1, 100, "seller", "gold", 10, 5)
+    testSellOrderCreated (1, 100, ADDRESS1, "seller", "gold", 10, 5)
     testSellOrderUpdated (1, 5, 1)
 
     assert.fieldEquals ("SellOrder", "1", "amount", "5")
@@ -107,8 +111,8 @@ describe ("SellOrders", () => {
   })
 
   test ("Removal", () => {
-    testSellOrderCreated (1, 100, "seller", "gold", 10, 5)
-    testSellOrderCreated (2, 200, "seler", "silver", 100, 10)
+    testSellOrderCreated (1, 100, ADDRESS1, "seller", "gold", 10, 5)
+    testSellOrderCreated (2, 200, ADDRESS1, "seler", "silver", 100, 10)
     testSellOrderRemoved (2)
 
     assert.fieldEquals ("SellOrder", "1", "asset", "gold")

@@ -1,5 +1,5 @@
 import { newMockEvent } from "matchstick-as/assembly/index"
-import { ethereum } from "@graphprotocol/graph-ts"
+import { Address, ethereum } from "@graphprotocol/graph-ts"
 
 import {
   Trade as TradeEvent,
@@ -22,6 +22,11 @@ import {
 } from "../src/democrit"
 
 import { BigInt } from "@graphprotocol/graph-ts"
+
+export const ADDRESS1: Address
+    = Address.fromString ("0xabababababababababababababababababababab")
+export const ADDRESS2: Address
+    = Address.fromString ("0xfefefefefefefefefefefefefefefefefefefefe")
 
 /* ************************************************************************** */
 
@@ -94,7 +99,8 @@ export function testVaultEmptied (vaultId: i32): void
 /* ************************************************************************** */
 
 export function testSellOrderCreated (orderId: i32, vaultId: i32,
-                                      seller: string, asset: string,
+                                      creator: Address, seller: string,
+                                      asset: string,
                                       amount: i32, sats: i32): void
 {
   let o = changetype<SellOrderCreatedEvent> (newMockEvent ())
@@ -103,6 +109,8 @@ export function testSellOrderCreated (orderId: i32, vaultId: i32,
       new ethereum.EventParam ("orderId", ethereum.Value.fromI32 (orderId)))
   o.parameters.push (
       new ethereum.EventParam ("vaultId", ethereum.Value.fromI32 (vaultId)))
+  o.parameters.push (
+      new ethereum.EventParam ("creator", ethereum.Value.fromAddress (creator)))
   o.parameters.push (
       new ethereum.EventParam ("seller", ethereum.Value.fromString (seller)))
   o.parameters.push (

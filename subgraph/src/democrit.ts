@@ -91,6 +91,7 @@ export function handleSellOrderCreated (event: SellOrderCreatedEvent): void
   let vaultId = event.params.vaultId.toString ()
   let order = new SellOrder (id)
 
+  order.creator = event.params.creator
   order.seller = event.params.seller
   order.asset = event.params.asset
   order.amount = event.params.amount

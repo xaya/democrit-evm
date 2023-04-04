@@ -29,12 +29,14 @@ contract ("LimitSelling", accounts => {
   /**
    * Expects that a sell order with the given specifics exists.
    */
-  async function assertSellOrder (orderId, vaultId, seller, asset, amount, sats)
+  async function assertSellOrder (orderId, vaultId, creator, seller,
+                                  asset, amount, sats)
   {
     const data = await dem.getSellOrder (orderId);
     assert.equal (data["orderId"], orderId);
     assert.equal (data["vaultId"], vaultId);
-    assert.equal (data["owner"], seller);
+    assert.equal (data["creator"], creator);
+    assert.equal (data["seller"], seller);
     assert.equal (data["asset"], asset);
     assert.equal (data["remainingAmount"], amount);
     assert.equal (data["totalSats"], sats);
@@ -48,7 +50,8 @@ contract ("LimitSelling", accounts => {
     const data = await dem.getSellOrder (orderId);
     assert.equal (data["orderId"], "0");
     assert.equal (data["vaultId"], "0");
-    assert.equal (data["owner"], "");
+    assert.equal (data["creator"], utils.nullAddress);
+    assert.equal (data["seller"], "");
     assert.equal (data["asset"], "");
     assert.equal (data["remainingAmount"], "0");
     assert.equal (data["totalSats"], "0");
@@ -141,8 +144,8 @@ contract ("LimitSelling", accounts => {
     await utils.assertVault (dem, 1, "seller", "gold", 5);
     await utils.assertVault (dem, 2, "seller", "silver", 100);
 
-    await assertSellOrder (101, 1, "seller", "gold", 5, 10);
-    await assertSellOrder (102, 2, "seller", "silver", 100, 1);
+    await assertSellOrder (101, 1, seller, "seller", "gold", 5, 10);
+    await assertSellOrder (102, 2, seller, "seller", "silver", 100, 1);
   });
 
   it ("fails to cancel non-existing orders", async () => {
@@ -173,7 +176,7 @@ contract ("LimitSelling", accounts => {
     await assertNoSellOrder (101);
     await utils.assertNoVault (dem, 1);
 
-    await assertSellOrder (102, 2, "seller", "silver", 100, 1);
+    await assertSellOrder (102, 2, seller, "seller", "silver", 100, 1);
     await utils.assertVault (dem, 2, "seller", "silver", 100);
   });
 
@@ -224,6 +227,33 @@ contract ("LimitSelling", accounts => {
       "WCHI: insufficient balance");
   });
 
+  it ("fails if the seller name has been transferred", async () => {
+    const {orderId, cpHash}
+        = await createCheckpointedOrder ("seller", "gold", 5, 10, seller);
+    const afterCreate = await web3.eth.getBlockNumber () + 1;
+
+    const tokenId = await acc.tokenIdForName ("p", "seller");
+    await acc.safeTransferFrom (seller, buyer, tokenId, {from: seller});
+
+    await truffleAssert.reverts (
+      dem.acceptSellOrder ({
+        orderId, amountBought: 5, buyer: "buyer", checkpoint: cpHash,
+      }, {from: buyer}),
+      "seller name has been transferred");
+
+    /* Cancelling the order is still possible, so the new owner can get
+       back the locked funds.  */
+    await dem.cancelSellOrder (orderId, {from: buyer});
+    assert.deepEqual (
+      await utils.getMoves (acc, afterCreate), [
+      ["ctrl", {"g": {"gid": {
+        "send": "5 gold from ctrl:1 to seller"
+      }}}],
+    ]);
+    assertNoSellOrder (orderId);
+    utils.assertNoVault (dem, 1);
+  });
+
   it ("accepts a full sell order correctly", async () => {
     const {orderId, cpHash}
         = await createCheckpointedOrder ("seller", "gold", 5, 10, seller);
@@ -263,7 +293,7 @@ contract ("LimitSelling", accounts => {
       }}}],
     ]);
 
-    await assertSellOrder (101, 1, "seller", "gold", 3, 6);
+    await assertSellOrder (101, 1, seller, "seller", "gold", 3, 6);
     await utils.assertVault (dem, 1, "seller", "gold", 3);
 
     assert.equal (await wchi.balanceOf (seller), 4);

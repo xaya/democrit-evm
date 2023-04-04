@@ -31,6 +31,9 @@ type Vault @entity {
 type SellOrder @entity {
   id: String!
   vault: Vault!
+  "The owner address when the order was created."
+  creator: Bytes!
+  "The account name associated to the order/seller."
   seller: String!
   asset: String!
   amount: BigInt!
