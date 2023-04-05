@@ -26,6 +26,8 @@ const DemocritTestHelper = artifacts.require ("DemocritTestHelper");
 const nullAddress = "0x0000000000000000000000000000000000000000";
 const maxUint256 = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
 
+/* ************************************************************************** */
+
 /**
  * Sets up the basic contract environment including WCHI, XayaAccounts
  * with a test policy, and XayaDelegation.  The provided address is used
@@ -117,6 +119,8 @@ async function setupTradingTest (testConfig, supply, buyer, seller, balance)
   return {wchi, acc, del, dem};
 }
 
+/* ************************************************************************** */
+
 /**
  * Returns the moves sent on the Xaya accounts registry since the given
  * block height.
@@ -144,6 +148,8 @@ function ignoreCheckpoints (moves)
   return moves.filter (m => !("checkpoint" in m[1]["g"]["gid"]));
 }
 
+/* ************************************************************************** */
+
 /**
  * Asserts that the data for the vault with the given ID matches
  * the expected one.
@@ -167,6 +173,39 @@ async function assertNoVault (vm, id)
   assert.equal (data["balance"], "0");
 }
 
+/**
+ * Asserts that the given data value matches an existing sell order
+ * with the passed fields.
+ */
+function assertSellOrderData (data, orderId, vaultId, creator, seller,
+                              asset, amount, sats)
+{
+  assert.equal (data["orderId"], orderId);
+  assert.equal (data["vaultId"], vaultId);
+  assert.equal (data["creator"], creator);
+  assert.equal (data["seller"], seller);
+  assert.equal (data["asset"], asset);
+  assert.equal (data["remainingAmount"], amount);
+  assert.equal (data["totalSats"], sats);
+}
+
+/**
+ * Asserts that the given data value matches the null data for a
+ * sell order (that doesn't exist).
+ */
+function assertSellOrderNull (data)
+{
+  assert.equal (data["orderId"], "0");
+  assert.equal (data["vaultId"], "0");
+  assert.equal (data["creator"], nullAddress);
+  assert.equal (data["seller"], "");
+  assert.equal (data["asset"], "");
+  assert.equal (data["remainingAmount"], "0");
+  assert.equal (data["totalSats"], "0");
+}
+
+/* ************************************************************************** */
+
 module.exports = {
   nullAddress,
   maxUint256,
@@ -179,4 +218,6 @@ module.exports = {
   ignoreCheckpoints,
   assertVault,
   assertNoVault,
+  assertSellOrderData,
+  assertSellOrderNull,
 };

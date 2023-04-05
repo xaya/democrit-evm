@@ -33,13 +33,8 @@ contract ("LimitSelling", accounts => {
                                   asset, amount, sats)
   {
     const data = await dem.getSellOrder (orderId);
-    assert.equal (data["orderId"], orderId);
-    assert.equal (data["vaultId"], vaultId);
-    assert.equal (data["creator"], creator);
-    assert.equal (data["seller"], seller);
-    assert.equal (data["asset"], asset);
-    assert.equal (data["remainingAmount"], amount);
-    assert.equal (data["totalSats"], sats);
+    utils.assertSellOrderData (data, orderId, vaultId, creator, seller,
+                               asset, amount, sats);
   }
 
   /**
@@ -48,13 +43,7 @@ contract ("LimitSelling", accounts => {
   async function assertNoSellOrder (orderId)
   {
     const data = await dem.getSellOrder (orderId);
-    assert.equal (data["orderId"], "0");
-    assert.equal (data["vaultId"], "0");
-    assert.equal (data["creator"], utils.nullAddress);
-    assert.equal (data["seller"], "");
-    assert.equal (data["asset"], "");
-    assert.equal (data["remainingAmount"], "0");
-    assert.equal (data["totalSats"], "0");
+    utils.assertSellOrderNull (data);
   }
 
   /**
