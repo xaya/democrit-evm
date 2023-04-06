@@ -21,4 +21,12 @@ contract DemocritTestHelper is Democrit
     nextOrderId = firstId;
   }
 
+  /**
+   * @dev Sets the next order ID given out.
+   */
+  function setNextOrderId (uint value) public
+  {
+    nextOrderId = value;
+  }
+
 }

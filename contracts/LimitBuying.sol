@@ -66,6 +66,19 @@ contract LimitBuying is LimitSelling
   /** @dev Emitted when a pool is emptied / removed.  */
   event PoolRemoved (uint vaultId);
 
+  /** @dev All vaults that are sell deposits.  No extra data is needed.  */
+  mapping (uint => bool) private sellDeposits;
+
+  /** @dev Emitted when a sell deposit is created.  */
+  event SellDepositCreated (uint vaultId, string owner,
+                            string asset, uint amount);
+
+  /** @dev Emitted when a sell deposit changes balance.  */
+  event SellDepositUpdated (uint vaultId, uint newAmount);
+
+  /** @dev Emitted when a sell deposit is removed.  */
+  event SellDepositRemoved (uint vaultId);
+
   /* ************************************************************************ */
 
   constructor (VaultManager v)
@@ -185,6 +198,92 @@ contract LimitBuying is LimitSelling
     vm.sendFromVault (data.vaultId, data.operator, data.amount);
     delete pools[vaultId];
     emit PoolRemoved (vaultId);
+  }
+
+  /* ************************************************************************ */
+
+  /**
+   * @dev Complete data for a sell deposit, as it is returned in memory
+   * when querying the contract.
+   */
+  struct CompleteSellDeposit
+  {
+
+    /** @dev The vault's associated ID.  */
+    uint vaultId;
+
+    /** @dev The owner of the deposit.  */
+    string owner;
+
+    /** @dev The asset inside the vault.  */
+    string asset;
+
+    /** @dev Amount of asset remaining in the vault.  */
+    uint amount;
+
+  }
+
+  /**
+   * @dev Returns the data for a sell deposit.  They are identified and
+   * queried by vault ID.  If the vault does not exist or is not a sell
+   * deposit, then a null struct will be returned.
+   */
+  function getSellDeposit (uint vaultId)
+      public view returns (CompleteSellDeposit memory)
+  {
+    if (!sellDeposits[vaultId])
+      {
+        CompleteSellDeposit memory nullDeposit;
+        return nullDeposit;
+      }
+
+    VaultManager.VaultData memory vault = vm.getVault (vaultId);
+    assert (vault.balance > 0);
+
+    return CompleteSellDeposit ({
+      vaultId: vaultId,
+      owner: vault.founder,
+      asset: vault.asset,
+      amount: vault.balance
+    });
+  }
+
+  /**
+   * @dev Vaults the given funds into a freshly created sell deposit,
+   * that the user can then use to accept a buy order (or just keep
+   * available / redeem later).
+   */
+  function createSellDeposit (string memory owner,
+                              string memory asset, uint amount)
+      public returns (uint)
+  {
+    require (amount > 0, "non-zero amount required");
+    require (vm.hasAccountPermission (_msgSender (), owner),
+             "no permission to act on behalf of this account");
+
+    uint vaultId = vm.createVault (owner, asset, amount);
+    assert (vaultId > 0);
+
+    sellDeposits[vaultId] = true;
+    emit SellDepositCreated (vaultId, owner, asset, amount);
+
+    return vaultId;
+  }
+
+  /**
+   * @dev Cancels an existing sell deposit, refunding all remaining asset
+   * in the vault to the owner.
+   */
+  function cancelSellDeposit (uint vaultId) public
+  {
+    CompleteSellDeposit memory data = getSellDeposit (vaultId);
+    require (data.vaultId == vaultId, "sell deposit does not exist");
+    require (vm.hasAccountPermission (_msgSender (), data.owner),
+             "no permission to act on behalf of the owner account");
+
+    vm.sendFromVault (data.vaultId, data.owner, data.amount);
+    delete sellDeposits[vaultId];
+    emit SellDepositRemoved (vaultId);
   }
 
   /* ************************************************************************ */

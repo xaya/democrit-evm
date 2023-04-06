@@ -28,6 +28,8 @@ contract ("LimitBuying", accounts => {
     await utils.setupPoolOperator (dem, supply, pool, "pool");
   });
 
+  /* ************************************************************************ */
+
   /**
    * Expects that a pool with the given specifics exists.
    */
@@ -53,8 +55,6 @@ contract ("LimitBuying", accounts => {
     assert.equal (data["amount"], "0");
     assert.equal (data["relFee"], "0");
   }
-
-  /* ************************************************************************ */
 
   it ("computes the pool fee correctly", async () => {
     await truffleAssert.reverts (dem.getPoolFee (100, utils.maxUint256),
@@ -85,7 +85,7 @@ contract ("LimitBuying", accounts => {
         "fee too high");
   });
 
-  it ("verifies the sender address's permission", async () => {
+  it ("verifies the sender address's permission for a pool", async () => {
     await truffleAssert.reverts (
         dem.createPool ("pool", "", "gold", 1, 1, {from: seller}),
         "no permission");
@@ -134,5 +134,137 @@ contract ("LimitBuying", accounts => {
   });
 
   /* ************************************************************************ */
+
+  /**
+   * Expects that a sell deposit with the given specifics exists.
+   */
+  async function assertDeposit (vaultId, owner, asset, amount)
+  {
+    const data = await dem.getSellDeposit (vaultId);
+    assert.equal (data["vaultId"], vaultId);
+    assert.equal (data["owner"], owner);
+    assert.equal (data["asset"], asset);
+    assert.equal (data["amount"], amount);
+  }
+
+  /**
+   * Expects that no sell deposit with the given ID exists.
+   */
+  async function assertNoDeposit (vaultId)
+  {
+    const data = await dem.getSellDeposit (vaultId);
+    assert.equal (data["vaultId"], "0");
+    assert.equal (data["owner"], "");
+    assert.equal (data["asset"], "");
+    assert.equal (data["amount"], "0");
+  }
+
+  it ("returns nothing for a non-existing sell deposit", async () => {
+    assertNoDeposit (123);
+  });
+
+  it ("verifies asset and amount when creating a deposit", async () => {
+    await truffleAssert.reverts (
+        dem.createSellDeposit ("seller", "gold", 0, {from: seller}),
+        "non-zero amount required");
+    await truffleAssert.reverts (
+        dem.createSellDeposit ("seller", "invalid", 1, {from: seller}),
+        "invalid asset");
+  });
+
+  it ("verifies the sender address's permission for a deposit", async () => {
+    await truffleAssert.reverts (
+        dem.createSellDeposit ("seller", "gold", 1, {from: buyer}),
+        "no permission");
+  });
+
+  it ("creates a sell deposit correctly", async () => {
+    await dem.createSellDeposit ("seller", "gold", 5, {from: seller});
+
+    await utils.assertVault (vm, 1, "seller", "gold", 5);
+    await assertDeposit (1, "seller", "gold", 5);
+  });
+
+  it ("fails to cancel a non-existing deposit", async () => {
+    await truffleAssert.reverts (dem.cancelSellDeposit (1, {from: seller}),
+                                 "does not exist");
+  });
+
+  it ("verifies permission when cancelling a deposit", async () => {
+    await dem.createSellDeposit ("seller", "gold", 5, {from: seller});
+    await truffleAssert.reverts (dem.cancelSellDeposit (1, {from: buyer}),
+                                 "no permission");
+  });
+
+  it ("cancels a sell deposit correctly", async () => {
+    await dem.createSellDeposit ("seller", "gold", 5, {from: seller});
+    await dem.createSellDeposit ("seller", "silver", 100, {from: seller});
+
+    const afterCreate = await web3.eth.getBlockNumber () + 1;
+    await dem.cancelSellDeposit (1, {from: seller});
+    assert.deepEqual (
+      utils.ignoreCheckpoints (await utils.getMoves (acc, afterCreate)), [
+      ["ctrl", {"g": {"gid": {
+        "send": "5 gold from ctrl:1 to seller"
+      }}}],
+    ]);
+
+    await assertNoDeposit (1);
+    await utils.assertNoVault (vm, 1);
+
+    await assertDeposit (2, "seller", "silver", 100);
+    await utils.assertVault (vm, 2, "seller", "silver", 100);
+  });
+
+  /* ************************************************************************ */
+
+  it ("correctly distinguishes sell orders, trading pools and sell deposits",
+      async () => {
+    await dem.setNextOrderId (1);
+
+    await dem.createSellOrder ("seller", "gold", 1, 10, {from: seller});
+    await dem.createPool ("pool", "", "silver", 2, 10, {from: pool});
+    await dem.createSellDeposit ("seller", "copper", 3, {from: seller});
+
+    await utils.assertVault (vm, 1, "seller", "gold", 1);
+    await utils.assertVault (vm, 2, "pool", "silver", 2);
+    await utils.assertVault (vm, 3, "seller", "copper", 3);
+
+    utils.assertSellOrderData (await dem.getSellOrder (1), 1, 1, seller,
+                               "seller", "gold", 1, 10);
+    await assertNoPool (1);
+    await assertNoDeposit (1);
+
+    utils.assertSellOrderNull (await dem.getSellOrder (2));
+    await assertPool (2, "pool", "silver", 2, 10);
+    await assertNoDeposit (2);
+
+    utils.assertSellOrderNull (await dem.getSellOrder (3));
+    await assertNoPool (3);
+    await assertDeposit (3, "seller", "copper", 3);
+
+    await truffleAssert.reverts (dem.cancelSellOrder (2, {from: seller}),
+                                 "does not exist");
+    await truffleAssert.reverts (dem.cancelSellOrder (3, {from: seller}),
+                                 "does not exist");
+
+    await truffleAssert.reverts (dem.cancelPool (1, {from: pool}),
+                                 "does not exist");
+    await truffleAssert.reverts (dem.cancelPool (3, {from: pool}),
+                                 "does not exist");
+
+    await truffleAssert.reverts (dem.cancelSellDeposit (1, {from: seller}),
+                                 "does not exist");
+    await truffleAssert.reverts (dem.cancelSellDeposit (2, {from: seller}),
+                                 "does not exist");
+
+    await dem.cancelSellOrder (1, {from: seller});
+    await dem.cancelPool (2, {from: pool});
+    await dem.cancelSellDeposit (3, {from: seller});
+
+    await utils.assertNoVault (vm, 1);
+    await utils.assertNoVault (vm, 2);
+    await utils.assertNoVault (vm, 3);
+  });
 
 });
