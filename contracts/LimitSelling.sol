@@ -184,7 +184,6 @@ contract LimitSelling is VaultManager, Context
       public returns (uint)
   {
     require (amount > 0, "non-zero amount required");
-    require (config.isTradableAsset (asset), "invalid asset specified");
     require (hasAccountPermission (_msgSender (), seller),
              "no permission to act on behalf of this account");
 
