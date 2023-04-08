@@ -27,7 +27,6 @@ contract ("Democrit", accounts => {
   });
 
   it ("checks sell orders correctly", async () => {
-    await utils.createFounder (vm, buyer, "buyer");
     const tokenId = await acc.tokenIdForName ("p", "buyer");
 
     await dem.createSellOrder ("seller", "gold", 5, 10, {from: seller});

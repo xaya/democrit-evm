@@ -79,6 +79,51 @@ contract LimitBuying is LimitSelling
   /** @dev Emitted when a sell deposit is removed.  */
   event SellDepositRemoved (uint vaultId);
 
+  /**
+   * @dev The data stored for an active limit buy order.
+   */
+  struct BuyOrder
+  {
+
+    /**
+     * @dev The trading pool to be used.  If the pool becomes emptied and
+     * removed, the order itself will be seen as void (even if this struct
+     * is still in storage).  If the pool's balance drops below remainingAmount
+     * but is non-zero, then up to this amount can be bought.
+     */
+    uint poolId;
+
+    /**
+     * @dev The address which owned the buyer account name when the order
+     * was created.  It can only be taken if it still owns the account.
+     */
+    address creator;
+
+    /** @dev The account name owning this order.  */
+    string buyer;
+
+    /** @dev The amount of asset that is still to be bought.  */
+    uint remainingAmount;
+
+    /** @dev The total in WCHI sats offered for the remainingAmount.  */
+    uint totalSats;
+
+    /* The asset being bought is implied by the trading pool used.  */
+
+  }
+
+  /** @dev Existing buy orders by ID.  */
+  mapping (uint => BuyOrder) private buyOrders;
+
+  /** @dev Emitted when a buy order is created.  */
+  event BuyOrderCreated (uint orderId, uint poolId, address creator,
+                         string buyer, string asset,
+                         uint amount, uint totalSats);
+  /** @dev Emitted when a buy order is updated.  */
+  event BuyOrderUpdated (uint orderId, uint amount, uint totalSats);
+  /** @dev Emitted when a buy order is removed.  */
+  event BuyOrderRemoved (uint orderId);
+
   /* ************************************************************************ */
 
   constructor (VaultManager v)
@@ -284,6 +329,149 @@ contract LimitBuying is LimitSelling
     vm.sendFromVault (data.vaultId, data.owner, data.amount);
     delete sellDeposits[vaultId];
     emit SellDepositRemoved (vaultId);
+  }
+
+  /* ************************************************************************ */
+
+  /**
+   * @dev Complete data for a buy order, incorporating data from the
+   * associated trading pool.
+   */
+  struct CompleteBuyOrder
+  {
+
+    /** @dev The ID of the buy order.  */
+    uint orderId;
+
+    /** @dev The trading pool to be used.  */
+    uint poolId;
+
+    /** @dev Data about the trading pool.  */
+    CompletePool poolData;
+
+    /**
+     * @dev The address which owned the buyer account name when the order
+     * was created.  It can only be taken if it still owns the account.
+     */
+    address creator;
+
+    /** @dev The account name owning this order.  */
+    string buyer;
+
+    /** @dev The asset being bought.  */
+    string asset;
+
+    /** @dev The amount of asset that is still to be bought.  */
+    uint remainingAmount;
+
+    /** @dev The total in WCHI sats offered for the remainingAmount.  */
+    uint totalSats;
+
+  }
+
+  /**
+   * @dev Returns data about a buy order.
+   */
+  function getBuyOrder (uint orderId)
+      public view returns (CompleteBuyOrder memory)
+  {
+    BuyOrder storage data = buyOrders[orderId];
+    uint poolId = data.poolId;
+    if (poolId == 0)
+      {
+        /* The buy order itself does not exist for this ID.  */
+        CompleteBuyOrder memory nullOrder;
+        return nullOrder;
+      }
+
+    CompletePool memory pool = getPool (poolId);
+    if (pool.vaultId == 0)
+      {
+        /* The order ID exists, but the associated pool is removed.  */
+        CompleteBuyOrder memory nullOrder;
+        return nullOrder;
+      }
+
+    return CompleteBuyOrder ({
+      orderId: orderId,
+      poolId: poolId,
+      poolData: pool,
+      creator: data.creator,
+      buyer: data.buyer,
+      asset: pool.asset,
+      remainingAmount: data.remainingAmount,
+      totalSats: data.totalSats
+    });
+  }
+
+  /**
+   * @dev Creates a new limit buy order.
+   */
+  function createBuyOrder (string memory buyer, string memory asset,
+                           uint amount, uint totalSats,
+                           uint poolId, bytes32 checkpoint)
+      public returns (uint)
+  {
+    require (amount > 0, "non-zero amount required");
+    require (vm.hasAccountPermission (_msgSender (), buyer),
+             "no permission to act on behalf of this account");
+    /* There is no need to explicitly check the asset.  Since we only accept
+       assets that have a valid trading pool and that pool's creation only
+       allows valid assets, this is implied.  */
+
+    CompletePool memory pool = getPool (poolId);
+    /* This also implicitly checks that the pool exists, since otherwise
+       the balance would be zero (and amount is larger than zero).  */
+    require (pool.amount >= amount, "pool has insufficient balance");
+    require (keccak256 (abi.encodePacked (pool.asset))
+                == keccak256 (abi.encodePacked (asset)),
+             "pool asset mismatch");
+    require (vm.isCheckpoint (checkpoint), "pool checkpoint is invalid");
+
+    /* We do not lock the WCHI, but at least sanity check that at the
+       current moment, the buyer has a sufficient balance for the case
+       of fully buying the order.  */
+    address creator = vm.getAccountAddress (buyer);
+    uint poolFee = getPoolFee (pool.relFee, totalSats);
+    uint totalWchiCost = totalSats + poolFee;
+    require (wchi.balanceOf (creator) >= totalWchiCost,
+             "insufficient WCHI balance");
+    require (wchi.allowance (creator, address (this)) >= totalWchiCost,
+             "insufficient WCHI allowance");
+
+    uint orderId = nextOrderId++;
+    buyOrders[orderId] = BuyOrder ({
+      poolId: poolId,
+      creator: creator,
+      buyer: buyer,
+      remainingAmount: amount,
+      totalSats: totalSats
+    });
+    emit BuyOrderCreated (orderId, poolId, creator, buyer, asset,
+                          amount, totalSats);
+
+    return orderId;
+  }
+
+  /**
+   * @dev Cancels an existing buy order.
+   */
+  function cancelBuyOrder (uint orderId) public
+  {
+    /* We query the storage directly, instead of using getBuyOrder.  The
+       latter does not return an order if the associated pool is removed,
+       but we want to be able to cancel those as well (even if just
+       for the sake of it, as it won't have any practical implications).  */
+
+    BuyOrder storage data = buyOrders[orderId];
+    require (data.poolId > 0, "order does not exist");
+    require (vm.hasAccountPermission (_msgSender (), data.buyer),
+             "no permission to act on behalf of the buyer account");
+
+    /* Since no WCHI or anything else are locked, nothing needs to be
+       done apart from updating the order book.  */
+    delete buyOrders[orderId];
+    emit BuyOrderRemoved (orderId);
   }
 
   /* ************************************************************************ */

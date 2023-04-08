@@ -104,8 +104,8 @@ async function setupPoolOperator (dem, chiSupply, addr, name)
  * Sets up the testing environment we use for "full trading" tests.
  * This deploys a DemocritTestHelper instance in addition to the basic
  * Xaya contracts, and sets up a buyer and seller account.  The buyer
- * has a given initial balance of WCHI, and the seller owns a founder
- * name "seller".
+ * has a given initial balance of WCHI and the name "buyer", and the seller
+ * owns a founder name "seller".
  */
 async function setupTradingTest (testConfig, supply, buyer, seller, balance)
 {
@@ -118,10 +118,9 @@ async function setupTradingTest (testConfig, supply, buyer, seller, balance)
   await initialiseContract (vm, supply, "ctrl");
   await wchi.transfer (vm.address, 1000000, {from: supply});
 
-  /* We set up the buyer with a fixed initial balance of WCHI and the seller
-     without any, but configured with a founder name "seller".  */
   await setupWchi (acc, supply, buyer);
   await setupWchi (acc, supply, seller);
+  await createFounder (vm, buyer, "buyer");
   await createFounder (vm, seller, "seller");
   await wchi.transfer (supply, await wchi.balanceOf (seller), {from: seller});
   await wchi.transfer (buyer, balance - (await wchi.balanceOf (buyer)),
