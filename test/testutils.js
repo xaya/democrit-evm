@@ -151,6 +151,16 @@ function ignoreCheckpoints (moves)
 /* ************************************************************************** */
 
 /**
+ * Creates a checkpoint in the contract and returns its hash.
+ */
+async function createCheckpoint (vm)
+{
+  const cpHash = (await web3.eth.getBlock ("latest"))["hash"];
+  await vm.maybeCreateCheckpoint ();
+  return cpHash;
+}
+
+/**
  * Asserts that the data for the vault with the given ID matches
  * the expected one.
  */
@@ -216,6 +226,7 @@ module.exports = {
   setupTradingTest,
   getMoves,
   ignoreCheckpoints,
+  createCheckpoint,
   assertVault,
   assertNoVault,
   assertSellOrderData,

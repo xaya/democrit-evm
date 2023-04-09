@@ -54,8 +54,7 @@ contract ("LimitSelling", accounts => {
   {
     const orderId = (await dem.nextOrderId ()).toNumber ();
     await dem.createSellOrder (seller, asset, amount, sats, {from});
-    const cpHash = (await web3.eth.getBlock ("latest"))["hash"];
-    await dem.maybeCreateCheckpoint ();
+    const cpHash = await utils.createCheckpoint (dem);
     return {orderId, cpHash};
   }
 
