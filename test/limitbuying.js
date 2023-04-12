@@ -15,6 +15,7 @@ contract ("LimitBuying", accounts => {
   const buyer = accounts[1];
   const seller = accounts[2];
   const pool = accounts[3];
+  const poolSigner = accounts[4];
 
   let tc;
   before (async () => {
@@ -25,7 +26,7 @@ contract ("LimitBuying", accounts => {
   beforeEach (async () => {
     ({wchi, acc, del, vm, dem}
         = await utils.setupTradingTest (tc, supply, buyer, seller, BALANCE));
-    await utils.setupPoolOperator (dem, supply, pool, "pool");
+    await utils.setupPoolOperator (dem, supply, pool, "pool", poolSigner);
   });
 
   /* ************************************************************************ */
@@ -401,6 +402,50 @@ contract ("LimitBuying", accounts => {
     await dem.cancelBuyOrder (102, {from: buyer});
     await truffleAssert.reverts (dem.cancelBuyOrder (102, {from: buyer}),
                                  "does not exist");
+  });
+
+  /* ************************************************************************ */
+
+  it ("uses the correct EIP-712 domain separator", async () => {
+    const typeHash = web3.utils.keccak256 (
+      "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+    const domain =
+      {
+        "name": await dem.EIP712_NAME (),
+        "version": await dem.EIP712_VERSION (),
+        "chainId": await web3.eth.getChainId (),
+        "verifyingContract": dem.address,
+      };
+    const domainHash = web3.utils.soliditySha3 (
+      typeHash,
+      web3.utils.keccak256 (domain["name"]),
+      web3.utils.keccak256 (domain["version"]),
+      domain["chainId"],
+      web3.utils.padLeft (domain["verifyingContract"], 64)
+    );
+    assert.equal (await dem.domainSeparator (), domainHash);
+  });
+
+  it ("verifies pool signatures correctly", async () => {
+    const fakeCp = await utils.getBestBlock ();
+    const {vault, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 42, fakeCp);
+
+    assert.isTrue (await dem.isPoolSignatureValid ("pool", vault, signature));
+
+    assert.isFalse (await dem.isPoolSignatureValid ("buyer", vault, signature));
+    const vault2 = {
+      "vaultId": vault["vaultId"] + 1,
+      "checkpoint": vault["checkpoint"],
+    };
+    assert.isFalse (await dem.isPoolSignatureValid ("pool", vault2, signature));
+
+    await dem.bumpSignatureNonce ("pool", {from: pool});
+    const {vault: vault3, signature: signature3}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 42, fakeCp);
+    assert.isFalse (await dem.isPoolSignatureValid ("pool", vault, signature));
+    assert.isTrue (await dem.isPoolSignatureValid ("pool", vault3, signature3));
   });
 
   /* ************************************************************************ */

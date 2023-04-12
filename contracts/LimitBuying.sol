@@ -7,12 +7,18 @@ import "./IDemocritConfig.sol";
 import "./LimitSelling.sol";
 import "./VaultManager.sol";
 
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+
 /**
  * @dev This contract adds support for limit buy orders, together with the
  * trading pools needed for it, to Democrit.
  */
-contract LimitBuying is LimitSelling
+contract LimitBuying is LimitSelling, EIP712
 {
+
+  string public constant EIP712_NAME = "Democrit";
+  string public constant EIP712_VERSION = "1";
 
   /**
    * @dev The Democrit config.  This matches the config of the associated
@@ -124,10 +130,21 @@ contract LimitBuying is LimitSelling
   /** @dev Emitted when a buy order is removed.  */
   event BuyOrderRemoved (uint orderId);
 
+  /**
+   * @dev We use "nonce" values for the EIP712 pool signatures.  They are not
+   * single use, but a signature is only valid when it commits to the current
+   * nonce explicitly, and the nonce can be bumped on-demand to invalidate
+   * all made signatures in case that is necessary for some reason.
+   *
+   * The nonces are tied to the operator account name.
+   */
+  mapping (string => uint256) public signatureNonce;
+
   /* ************************************************************************ */
 
   constructor (VaultManager v)
     LimitSelling(v)
+    EIP712(EIP712_NAME, EIP712_VERSION)
   {
     config = v.config ();
   }
@@ -472,6 +489,70 @@ contract LimitBuying is LimitSelling
        done apart from updating the order book.  */
     delete buyOrders[orderId];
     emit BuyOrderRemoved (orderId);
+  }
+
+  /* ************************************************************************ */
+
+  /**
+   * @dev Returns the EIP712 domain separator used for signatures
+   * verified by this contract.
+   */
+  function domainSeparator () public view returns (bytes32)
+  {
+    return _domainSeparatorV4 ();
+  }
+
+  /**
+   * @dev The data signed by a trading pool with EIP712 when they have
+   * verified a given vault.
+   */
+  struct VaultCheck
+  {
+
+    /** @dev The vault ID they have verified.  */
+    uint256 vaultId;
+
+    /** @dev The checkpoint at which they have verified the vault exists.  */
+    bytes32 checkpoint;
+
+    /* The EIP712 signed struct also includes a nonce here, which is implied
+       by the contract state and thus not passed explicitly.  */
+
+  }
+
+  /**
+   * @dev Verifies if a given vault check has been signed correctly by
+   * the owner of the given account or an address authorised for it.
+   *
+   * Note that this only verifies if the signature is valid.  It does not check
+   * if the vault exists, the checkpoint is valid, or anything else like that.
+   */
+  function isPoolSignatureValid (string memory operator,
+                                 VaultCheck calldata vault,
+                                 bytes calldata signature)
+      public view returns (bool)
+  {
+    bytes memory body = abi.encode (
+      keccak256 ("VaultCheck(uint256 vaultId,bytes32 checkpoint,uint256 nonce)"),
+      vault.vaultId,
+      vault.checkpoint,
+      signatureNonce[operator]
+    );
+    bytes32 digest = _hashTypedDataV4 (keccak256 (body));
+
+    address signer = ECDSA.recover (digest, signature);
+    return vm.hasAccountPermission (signer, operator);
+  }
+
+  /**
+   * @dev Bumps the signature nonce for the given pool.  Returns the new
+   * nonce for the pool.
+   */
+  function bumpSignatureNonce (string memory operator) public returns (uint256)
+  {
+    require (vm.hasAccountPermission (_msgSender (), operator),
+             "no permission to act on behalf of the pool operator");
+    return ++signatureNonce[operator];
   }
 
   /* ************************************************************************ */

@@ -27,6 +27,9 @@ const DemocritTestHelper = artifacts.require ("DemocritTestHelper");
 const nullAddress = "0x0000000000000000000000000000000000000000";
 const maxUint256 = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
 
+/** Random mnemonic that is used for generating the pool signer addresses.  */
+const poolMnemonic = "bomb impulse limit arrest mother scout hamster sniff ticket write furnace slogan";
+
 /* ************************************************************************** */
 
 /**
@@ -87,17 +90,6 @@ async function createFounder (vm, fromAccount, name)
   await acc.setApprovalForAll (del.address, true, {from: fromAccount});
   await del.grant ("p", name, ["g"], vm.address, maxUint256, false,
                    {from: fromAccount});
-}
-
-/**
- * Sets up things for a pool operator account with the given address and name.
- */
-async function setupPoolOperator (dem, chiSupply, addr, name)
-{
-  const vm = await VaultManager.at (await dem.vm ());
-  const acc = await XayaAccounts.at (await vm.accountRegistry ());
-  await setupWchi (acc, chiSupply, addr);
-  await createFounder (vm, addr, name);
 }
 
 /**
@@ -182,6 +174,68 @@ async function createCheckpoint (vm)
 /* ************************************************************************** */
 
 /**
+ * Signs the pool data with the given address.  This returns the signature
+ * as hex string and the VaultCheck struct filled in, as expected
+ * by the verifying contract.
+ */
+async function signVaultCheck (dem, operator, addr, vaultId, checkpoint)
+{
+  const nonce = (await dem.signatureNonce (operator)).toNumber ();
+  const msg = {
+    "domain": {
+      "name": await dem.EIP712_NAME (),
+      "version": await dem.EIP712_VERSION (),
+      "chainId": await web3.eth.getChainId (),
+      "verifyingContract": dem.address,
+    },
+    "primaryType": "VaultCheck",
+    "types": {
+      "EIP712Domain": [
+        {"name": "name", "type": "string"},
+        {"name": "version", "type": "string"},
+        {"name": "chainId", "type": "uint256"},
+        {"name": "verifyingContract", "type": "address"},
+      ],
+      "VaultCheck": [
+        {"name": "vaultId", "type": "uint256"},
+        {"name": "checkpoint", "type": "bytes32"},
+        {"name": "nonce", "type": "uint256"},
+      ],
+    },
+    "message": {
+      "vaultId": vaultId,
+      "checkpoint": checkpoint,
+      "nonce": nonce,
+    },
+  };
+
+  const id = Date.now () + "_" + Math.random ();
+  const signature = await web3.currentProvider.request ({
+    "method": "eth_signTypedData_v4",
+    "params": [addr, msg],
+    "id": id,
+    "jsonrpc": "2.0",
+  });
+
+  const vault = {vaultId, checkpoint};
+  return {vault, signature};
+}
+
+/**
+ * Sets up things for a pool operator account with the given address and name.
+ */
+async function setupPoolOperator (dem, chiSupply, addr, name, signerAddr)
+{
+  const vm = await VaultManager.at (await dem.vm ());
+  const acc = await XayaAccounts.at (await vm.accountRegistry ());
+  await setupWchi (acc, chiSupply, addr);
+  await createFounder (vm, addr, name);
+  await acc.setApprovalForAll (signerAddr, true, {from: addr});
+}
+
+/* ************************************************************************** */
+
+/**
  * Asserts that the data for the vault with the given ID matches
  * the expected one.
  */
@@ -244,12 +298,13 @@ module.exports = {
   initialiseContract,
   setupWchi,
   createFounder,
-  setupPoolOperator,
   setupTradingTest,
   getMoves,
   getBestBlock,
   ignoreCheckpoints,
   createCheckpoint,
+  signVaultCheck,
+  setupPoolOperator,
   assertVault,
   assertNoVault,
   assertSellOrderData,
