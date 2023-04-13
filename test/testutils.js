@@ -138,6 +138,14 @@ async function getMoves (acc, fromBlock)
 }
 
 /**
+ * Returns the current best block hash.
+ */
+async function getBestBlock ()
+{
+  return (await web3.eth.getBlock ("latest"))["hash"];
+}
+
+/**
  * Filters the array of moves provided (as from getMoves), removing
  * all checkpoint moves.  They get auto-triggered during some otherwise
  * unrelated things, and thus for some tests it helps to filter them out
@@ -148,17 +156,17 @@ function ignoreCheckpoints (moves)
   return moves.filter (m => !("checkpoint" in m[1]["g"]["gid"]));
 }
 
-/* ************************************************************************** */
-
 /**
  * Creates a checkpoint in the contract and returns its hash.
  */
 async function createCheckpoint (vm)
 {
-  const cpHash = (await web3.eth.getBlock ("latest"))["hash"];
+  const cpHash = await getBestBlock ();
   await vm.maybeCreateCheckpoint ();
   return cpHash;
 }
+
+/* ************************************************************************** */
 
 /**
  * Asserts that the data for the vault with the given ID matches
@@ -225,6 +233,7 @@ module.exports = {
   createFounder,
   setupTradingTest,
   getMoves,
+  getBestBlock,
   ignoreCheckpoints,
   createCheckpoint,
   assertVault,

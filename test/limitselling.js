@@ -169,7 +169,7 @@ contract ("LimitSelling", accounts => {
   });
 
   it ("fails to accept a non-existing order", async () => {
-    const notCheckpointed = (await web3.eth.getBlock ("latest"))["hash"];
+    const notCheckpointed = await utils.getBestBlock ();
     await truffleAssert.reverts (
       dem.acceptSellOrder ({
         orderId: 123, amountBought: 1, buyer: "buyer",
@@ -180,7 +180,7 @@ contract ("LimitSelling", accounts => {
 
   it ("verifies the checkpoint when accepting an order", async () => {
     await dem.createSellOrder ("seller", "gold", 5, 10, {from: seller});
-    const notCheckpointed = (await web3.eth.getBlock ("latest"))["hash"];
+    const notCheckpointed = await utils.getBestBlock ();
     await truffleAssert.reverts (
       dem.acceptSellOrder ({
         orderId: 101, amountBought: 1, buyer: "buyer",
