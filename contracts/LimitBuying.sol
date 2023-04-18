@@ -557,4 +557,138 @@ contract LimitBuying is LimitSelling, EIP712
 
   /* ************************************************************************ */
 
+  /**
+   * @dev Arguments required for accepting a buy order ("market sell").
+   * They are collected into a struct so that we can provide also a method
+   * for batch-accepting multiple orders easily.
+   */
+  struct AcceptedBuyOrder
+  {
+
+    /** The order ID being accepted.  */
+    uint orderId;
+
+    /** The amount of asset being sold.  */
+    uint amountSold;
+
+    /** Sell deposit and checkpoint at which the pool has verified it.  */
+    VaultCheck deposit;
+
+    /** The pool's signature on the vault check.  */
+    bytes signature;
+
+    /* The limit price of orders is fixed once the order is created, so that
+       we do not need to explicitly specify the expected price in sats in the
+       order.
+
+       The trading pool's ID is implicit from the order accepted,
+       and the seller account is fixed by the used sell deposit.  */
+
+  }
+
+  /**
+   * @dev Accepts a limit buy order, selling all or part of the desired asset
+   * utilising a sell deposit and trading pool.
+   */
+  function acceptBuyOrder (AcceptedBuyOrder calldata args) public
+  {
+    CompleteBuyOrder memory order = getBuyOrder (args.orderId);
+    require (order.orderId > 0, "order does not exist");
+    assert (order.poolData.vaultId > 0);
+    /* Calculating the purchase amount of sats already checks the
+       amount bought is non-zero and within the available limits for
+       the order.  The limits for the sell deposit and trading pool balances
+       are checked when we attempt to transfer from the respective vaults.  */
+    uint sats = getSatsForPurchase (order.remainingAmount, order.totalSats,
+                                    args.amountSold);
+    uint fee = getPoolFee (order.poolData.relFee, sats);
+
+    require (vm.isCheckpoint (args.deposit.checkpoint),
+             "vault checkpoint is invalid");
+    require (isPoolSignatureValid (order.poolData.operator, args.deposit,
+                                   args.signature),
+             "pool signature of the vault check is invalid");
+    /* The order creation already verifies that the pool asset matches
+       the order's asset.  */
+
+    CompleteSellDeposit memory deposit = getSellDeposit (args.deposit.vaultId);
+    require (deposit.vaultId > 0, "sell deposit does not exist");
+    require (keccak256 (abi.encodePacked (deposit.asset))
+                == keccak256 (abi.encodePacked (order.asset)),
+             "deposit asset mismatch");
+    require (vm.hasAccountPermission (_msgSender (), deposit.owner),
+             "no permission to act on behalf of the deposit owner");
+
+    address buyerAddress = vm.getAccountAddress (order.buyer);
+    require (buyerAddress == order.creator, "buyer name has been transferred");
+    address poolAddress = vm.getAccountAddress (order.poolData.operator);
+
+    require (wchi.transferFrom (buyerAddress, _msgSender (), sats),
+             "WCHI transfer failed");
+    require (wchi.transferFrom (buyerAddress, poolAddress, fee),
+             "WCHI transfer failed");
+    vm.sendFromVault (deposit.vaultId, order.poolData.operator,
+                      args.amountSold);
+    vm.sendFromVault (order.poolData.vaultId, order.buyer, args.amountSold);
+
+    emit Trade (order.asset, args.amountSold, sats, deposit.owner, order.buyer);
+
+    bool poolEmptied = (order.poolData.amount == args.amountSold);
+    if (poolEmptied)
+      {
+        delete pools[order.poolData.vaultId];
+        emit PoolRemoved (order.poolData.vaultId);
+      }
+    else
+      {
+        uint newRemaining = order.poolData.amount - args.amountSold;
+        assert (newRemaining > 0);
+        emit PoolUpdated (order.poolData.vaultId, newRemaining);
+      }
+
+    if (args.amountSold == order.remainingAmount || poolEmptied)
+      {
+        /* Note that if the pool was emptied (instead of the order fulfilled
+           completely), we can still delete the order since there are no
+           tokens or assets locked/reserved for buy orders.  */
+        delete buyOrders[order.orderId];
+        emit BuyOrderRemoved (order.orderId);
+      }
+    else
+      {
+        uint newRemaining = order.remainingAmount - args.amountSold;
+        assert (newRemaining > 0);
+        uint newSats = order.totalSats - sats;
+
+        BuyOrder storage ptr = buyOrders[order.orderId];
+        assert (ptr.poolId > 0);
+        ptr.remainingAmount = newRemaining;
+        ptr.totalSats = newSats;
+        emit BuyOrderUpdated (order.orderId, newRemaining, newSats);
+      }
+
+    if (args.amountSold == deposit.amount)
+      {
+        delete sellDeposits[deposit.vaultId];
+        emit SellDepositRemoved (deposit.vaultId);
+      }
+    else
+      {
+        uint newRemaining = deposit.amount - args.amountSold;
+        assert (newRemaining > 0);
+        emit SellDepositUpdated (deposit.vaultId, newRemaining);
+      }
+  }
+
+  /**
+   * @dev Accepts a batch of limit buy orders as per acceptBuyOrder.
+   */
+  function acceptBuyOrders (AcceptedBuyOrder[] calldata orders) public
+  {
+    for (uint i = 0; i < orders.length; ++i)
+      acceptBuyOrder (orders[i]);
+  }
+
+  /* ************************************************************************ */
+
 }

@@ -223,6 +223,7 @@ async function signVaultCheck (dem, operator, addr, vaultId, checkpoint)
 
 /**
  * Sets up things for a pool operator account with the given address and name.
+ * The address is left with no WCHI balance after creating the name.
  */
 async function setupPoolOperator (dem, chiSupply, addr, name, signerAddr)
 {
@@ -231,6 +232,9 @@ async function setupPoolOperator (dem, chiSupply, addr, name, signerAddr)
   await setupWchi (acc, chiSupply, addr);
   await createFounder (vm, addr, name);
   await acc.setApprovalForAll (signerAddr, true, {from: addr});
+
+  const balance = await wchi.balanceOf (addr);
+  await wchi.transfer (chiSupply, balance, {from: addr});
 }
 
 /* ************************************************************************** */

@@ -450,6 +450,339 @@ contract ("LimitBuying", accounts => {
 
   /* ************************************************************************ */
 
+  it ("fails to accept a buy order if something does not exist", async () => {
+    await dem.createPool ("pool", "", "gold", 100, 0, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 100, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 10, 50, 1, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+
+    /* The order itself does not exist.  */
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 123, amountSold: 5, deposit, signature},
+                            {from: seller}),
+        "order does not exist");
+
+    /* The sell deposit does not exist.  */
+    const {vault: deposit2, signature: signature2}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 987, cpHash);
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({
+            orderId: 101, amountSold: 5,
+            deposit: deposit2, signature: signature2,
+        }, {from: seller}),
+        "sell deposit does not exist");
+
+    /* The order "exists", but the associated pool has been removed.  */
+    await dem.cancelPool (1, {from: pool});
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 101, amountSold: 5, deposit, signature},
+                            {from: seller}),
+        "order does not exist");
+  });
+
+  it ("fails to accept an order if the amount is invalid", async () => {
+    await dem.createPool ("pool", "", "gold", 100, 0, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 100, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 10, 50, 1, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 101, amountSold: 0, deposit, signature},
+                            {from: seller}),
+        "non-zero");
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 101, amountSold: 11, deposit, signature},
+                            {from: seller}),
+        "amount exceeds remaining");
+  });
+
+  it ("fails to accept an order if the amount exceeds the pool", async () => {
+    await dem.createPool ("pool", "", "gold", 10, 0, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 100, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    /* We cannot create a buy order that is larger as the pool already,
+       so we create two "competing" orders that fit, and then partially
+       accept both which goes over the pool capacity.  */
+    await dem.createBuyOrder ("buyer", "gold", 10, 50, 1, cpHash,
+                              {from: buyer});
+    await dem.createBuyOrder ("buyer", "gold", 10, 50, 1, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+
+    await dem.acceptBuyOrder ({orderId: 101, amountSold: 6, deposit, signature},
+                              {from: seller});
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 102, amountSold: 6, deposit, signature},
+                            {from: seller}),
+        "not enough funds in vault");
+  });
+
+  it ("fails to accept an order if the amount exceeds the deposit",
+      async () => {
+    await dem.createPool ("pool", "", "gold", 100, 0, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 10, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 100, 50, 1, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 101, amountSold: 11, deposit, signature},
+                            {from: seller}),
+        "not enough funds in vault");
+  });
+
+  it ("fails to accept an order if the vault check is invalid", async () => {
+    const noCheckpoint = await utils.getBestBlock ();
+    await dem.createPool ("pool", "", "gold", 100, 0, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 10, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 100, 50, 1, cpHash,
+                              {from: buyer});
+
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, noCheckpoint);
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 101, amountSold: 5, deposit, signature},
+                            {from: seller}),
+        "checkpoint is invalid");
+
+    const {vault: deposit2, signature: signature2}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+    await acc.setApprovalForAll (poolSigner, false, {from: pool});
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({
+            orderId: 101, amountSold: 5,
+            deposit: deposit2, signature: signature2,
+        }, {from: seller}),
+        "pool signature of the vault check is invalid");
+  });
+
+  it ("fails to accept an order if the sell deposit asset is wrong",
+      async () => {
+    await dem.createPool ("pool", "", "gold", 100, 0, {from: pool});
+    await dem.createSellDeposit ("seller", "silver", 10, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 100, 50, 1, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 101, amountSold: 5, deposit, signature},
+                            {from: seller}),
+        "deposit asset mismatch");
+  });
+
+  it ("verifies the account permission when accepting a buy order",
+      async () => {
+    await dem.createPool ("pool", "", "gold", 100, 0, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 10, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 100, 50, 1, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 101, amountSold: 5, deposit, signature},
+                            {from: buyer}),
+        "no permission to act on behalf of the deposit owner");
+  });
+
+  it ("fails if the buyer name has been transferred", async () => {
+    await dem.createPool ("pool", "", "gold", 100, 0, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 10, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 100, 50, 1, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+
+    const tokenId = await acc.tokenIdForName ("p", "buyer");
+    await acc.safeTransferFrom (buyer, seller, tokenId, {from: buyer});
+
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 101, amountSold: 5, deposit, signature},
+                            {from: seller}),
+        "buyer name has been transferred");
+  });
+
+  it ("fails to accept a buy order if the WCHI balance is insufficient",
+      async () => {
+    /* When creating a buy order, the balance is checked.  So we need to
+       create the orders with a higher balance, and then decrease it afterwards
+       to a lower one that is insufficient to accept the orders in full.  */
+    const lowBalance = BALANCE / 100;
+
+    await dem.createPool ("pool", "", "gold", 100, 1, {from: pool});
+    await dem.createPool ("pool", "", "gold", 100, 0, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 100, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 20, 2 * lowBalance, 1, cpHash,
+                              {from: buyer});
+    await dem.createBuyOrder ("buyer", "gold", 20, 2 * lowBalance, 2, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 3, cpHash);
+
+    await wchi.transfer (supply, BALANCE - lowBalance, {from: buyer});
+    assert.equal (await wchi.balanceOf (buyer), lowBalance);
+
+    /* While the buyer could in theory afford all of the asset bought, it will
+       not be able to affort the fee charged on top.  */
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 101, amountSold: 10, deposit, signature},
+                            {from: seller}),
+        "WCHI: insufficient balance");
+    /* Here there is no fee, but the buyer cannot afford the amount bought.  */
+    await truffleAssert.reverts (
+        dem.acceptBuyOrder ({orderId: 102, amountSold: 11, deposit, signature},
+                            {from: seller}),
+        "WCHI: insufficient balance");
+  });
+
+  it ("can accept a buy order completely", async () => {
+    await dem.createPool ("pool", "", "gold", 10, 10, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 10, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 10, 50, 1, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+    const afterCreate = await web3.eth.getBlockNumber () + 1;
+
+    await dem.acceptBuyOrder (
+        {orderId: 101, amountSold: 10, deposit, signature},
+        {from: seller});
+
+    assert.deepEqual (
+      await utils.getMoves (acc, afterCreate), [
+      ["ctrl", {"g": {"gid": {
+        "send": "10 gold from ctrl:2 to pool"
+      }}}],
+      ["ctrl", {"g": {"gid": {
+        "send": "10 gold from ctrl:1 to buyer"
+      }}}],
+    ]);
+
+    await assertNoBuyOrder (101);
+    await assertNoPool (1);
+    await utils.assertNoVault (vm, 1);
+    await assertNoDeposit (2);
+    await utils.assertNoVault (vm, 2);
+
+    assert.equal (await wchi.balanceOf (seller), 50);
+    assert.equal (await wchi.balanceOf (pool), 5);
+    assert.equal (await wchi.balanceOf (buyer), BALANCE - 55);
+  });
+
+  it ("can accept a buy order partially", async () => {
+    await dem.createPool ("pool", "", "gold", 10, 10, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 10, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 10, 50, 1, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+    const afterCreate = await web3.eth.getBlockNumber () + 1;
+
+    await dem.acceptBuyOrder (
+        {orderId: 101, amountSold: 5, deposit, signature},
+        {from: seller});
+
+    assert.deepEqual (
+      await utils.getMoves (acc, afterCreate), [
+      ["ctrl", {"g": {"gid": {
+        "send": "5 gold from ctrl:2 to pool"
+      }}}],
+      ["ctrl", {"g": {"gid": {
+        "send": "5 gold from ctrl:1 to buyer"
+      }}}],
+    ]);
+
+    await assertBuyOrder (101, 1, "pool", 5, 10,
+                          buyer, "buyer", "gold", 5, 25);
+    await assertPool (1, "pool", "gold", 5, 10);
+    await utils.assertVault (vm, 1, "pool", "gold", 5);
+    await assertDeposit (2, "seller", "gold", 5);
+    await utils.assertVault (vm, 2, "seller", "gold", 5);
+
+    assert.equal (await wchi.balanceOf (seller), 25);
+    assert.equal (await wchi.balanceOf (pool), 3);
+    assert.equal (await wchi.balanceOf (buyer), BALANCE - 28);
+  });
+
+  it ("removes a buy order if the pool gets emptied", async () => {
+    await dem.createPool ("pool", "", "gold", 20, 10, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 20, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 10, 50, 1, cpHash,
+                              {from: buyer});
+    await dem.createBuyOrder ("buyer", "gold", 10, 50, 1, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+
+    await dem.acceptBuyOrder (
+        {orderId: 101, amountSold: 10, deposit, signature},
+        {from: seller});
+    await dem.acceptBuyOrder (
+        {orderId: 102, amountSold: 10, deposit, signature},
+        {from: seller});
+
+    await assertNoBuyOrder (101);
+    await assertNoBuyOrder (102);
+    await assertNoPool (1);
+    await utils.assertNoVault (vm, 1);
+  });
+
+  it ("can accept a batch of buy orders", async () => {
+    await dem.createPool ("pool", "", "gold", 10, 10, {from: pool});
+    await dem.createSellDeposit ("seller", "gold", 10, {from: seller});
+    const cpHash = await utils.createCheckpoint (vm);
+    await dem.createBuyOrder ("buyer", "gold", 10, 50, 1, cpHash,
+                              {from: buyer});
+    const {vault: deposit, signature}
+        = await utils.signVaultCheck (dem, "pool", poolSigner, 2, cpHash);
+    const afterCreate = await web3.eth.getBlockNumber () + 1;
+
+    await dem.acceptBuyOrders ([
+        {orderId: 101, amountSold: 5, deposit, signature},
+        {orderId: 101, amountSold: 3, deposit, signature},
+    ], {from: seller});
+
+    assert.deepEqual (
+      await utils.getMoves (acc, afterCreate), [
+      ["ctrl", {"g": {"gid": {
+        "send": "5 gold from ctrl:2 to pool"
+      }}}],
+      ["ctrl", {"g": {"gid": {
+        "send": "5 gold from ctrl:1 to buyer"
+      }}}],
+      ["ctrl", {"g": {"gid": {
+        "send": "3 gold from ctrl:2 to pool"
+      }}}],
+      ["ctrl", {"g": {"gid": {
+        "send": "3 gold from ctrl:1 to buyer"
+      }}}],
+    ]);
+
+    assert.equal (await wchi.balanceOf (seller), 40);
+    assert.equal (await wchi.balanceOf (pool), 5);
+    assert.equal (await wchi.balanceOf (buyer), BALANCE - 45);
+  });
+
+  /* ************************************************************************ */
+
   it ("correctly distinguishes orders, trading pools and sell deposits",
       async () => {
     await dem.setNextOrderId (1);
