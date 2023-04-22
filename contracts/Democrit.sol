@@ -4,6 +4,7 @@
 pragma solidity ^0.8.19;
 
 import "./LimitSelling.sol";
+import "./VaultManager.sol";
 
 /**
  * @dev This is the main contract for the Democrit exchange.  Most of the
@@ -13,8 +14,8 @@ import "./LimitSelling.sol";
 contract Democrit is LimitSelling
 {
 
-  constructor (XayaDelegation del, IDemocritConfig cfg)
-    LimitSelling(del, cfg)
+  constructor (VaultManager v)
+    LimitSelling(v)
   {}
 
   /**
@@ -57,7 +58,7 @@ contract Democrit is LimitSelling
         res[i].exists = (res[i].order.orderId == orderIds[i]);
         if (res[i].exists)
           {
-            address owner = getAccountAddress (res[i].order.seller);
+            address owner = vm.getAccountAddress (res[i].order.seller);
             res[i].valid = (res[i].order.creator == owner);
           }
       }

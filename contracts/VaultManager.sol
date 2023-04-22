@@ -7,6 +7,8 @@ import "./AccountHolder.sol";
 import "./IDemocritConfig.sol";
 import "./JsonUtils.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 /**
  * @dev This is a contract that manages a set of trading vaults in a
  * Democrit application.  It keeps track of each vault's state as it should
@@ -16,10 +18,15 @@ import "./JsonUtils.sol";
  * The contract is an AccountHolder, with the owned account acting as
  * controller for the vaults.  Vaults can be created (and funded in the
  * same transaction), and assets can be sent from vaults to arbitrary users.
- * These functions are exposed as internal methods, which subcontracts can
- * use to explicitly implement certain logic, e.g. trading.
+ *
+ * This contract is deployed stand-alone, but access to write methods (creating
+ * vaults and transferring assets from vaults) is restricted to the "owner".
+ * This owner will in production be the Democrit trading contract, which
+ * utilises the vaults and triggers vault actions.  Note that in contrast
+ * to many smart contracts, this "ownership" does not mean that anyone
+ * (including the Xaya team) has any special access to user funds!
  */
-contract VaultManager is AccountHolder
+contract VaultManager is AccountHolder, Ownable
 {
 
   /** @dev The contract defining the Democrit config for this app.  */
@@ -131,7 +138,7 @@ contract VaultManager is AccountHolder
    */
   function createVault (string memory founder, string memory asset,
                         uint initialBalance)
-      internal returns (uint)
+      public onlyOwner returns (uint)
   {
     require (config.isTradableAsset (asset), "invalid asset for vault");
     require (initialBalance > 0, "initial balance must be positive");
@@ -172,7 +179,7 @@ contract VaultManager is AccountHolder
    * is emptied, it will be cleared completely in the storage.
    */
   function sendFromVault (uint vaultId, string memory recipient, uint amount)
-      internal
+      public onlyOwner
   {
     require (amount > 0, "trying to send zero amount");
 

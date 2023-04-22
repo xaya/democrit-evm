@@ -21,6 +21,7 @@ const delegatorData
 const XayaDelegation = truffleContract (delegatorData);
 XayaDelegation.setProvider (web3.currentProvider);
 
+const VaultManager = artifacts.require ("VaultManager");
 const DemocritTestHelper = artifacts.require ("DemocritTestHelper");
 
 const nullAddress = "0x0000000000000000000000000000000000000000";
@@ -98,17 +99,19 @@ async function createFounder (vm, fromAccount, name)
 async function setupTradingTest (testConfig, supply, buyer, seller, balance)
 {
   const {wchi, acc, del} = await xayaEnvironment (supply);
-  const dem = await DemocritTestHelper.new (
-      del.address, testConfig.address, 101);
+  const vm = await VaultManager.new (del.address, testConfig.address,
+                                     {from: supply});
+  const dem = await DemocritTestHelper.new (vm.address, 101);
+  await vm.transferOwnership (dem.address, {from: supply});
   await setupWchi (acc, supply, supply);
-  await initialiseContract (dem, supply, "ctrl");
-  await wchi.transfer (dem.address, 1000000, {from: supply});
+  await initialiseContract (vm, supply, "ctrl");
+  await wchi.transfer (vm.address, 1000000, {from: supply});
 
   /* We set up the buyer with a fixed initial balance of WCHI and the seller
      without any, but configured with a founder name "seller".  */
   await setupWchi (acc, supply, buyer);
   await setupWchi (acc, supply, seller);
-  await createFounder (dem, seller, "seller");
+  await createFounder (vm, seller, "seller");
   await wchi.transfer (supply, await wchi.balanceOf (seller), {from: seller});
   await wchi.transfer (buyer, balance - (await wchi.balanceOf (buyer)),
                        {from: supply});
@@ -116,7 +119,7 @@ async function setupTradingTest (testConfig, supply, buyer, seller, balance)
   assert.equal (await wchi.balanceOf (buyer), balance);
   await wchi.approve (dem.address, maxUint256, {from: buyer});
 
-  return {wchi, acc, del, dem};
+  return {wchi, acc, del, vm, dem};
 }
 
 /* ************************************************************************** */

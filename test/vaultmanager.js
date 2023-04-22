@@ -19,7 +19,8 @@ contract ("VaultManager", accounts => {
   let wchi, acc, del, ah;
   beforeEach (async () => {
     ({wchi, acc, del} = await utils.xayaEnvironment (addr));
-    vm = await VaultManagerTestHelper.new (del.address, tc.address);
+    vm = await VaultManagerTestHelper.new (del.address, tc.address,
+                                           {from: addr});
     await utils.setupWchi (acc, addr, addr);
     await wchi.transfer (vm.address, 1000000, {from: addr});
 
@@ -45,12 +46,12 @@ contract ("VaultManager", accounts => {
   });
 
   it ("has no index zero vault", async () => {
-    await vm.create ("founder", "gold", 100, {from: addr});
+    await vm.createVault ("founder", "gold", 100, {from: addr});
     await utils.assertNoVault (vm, 0);
   });
 
   it ("sends moves for creating vaults correctly", async () => {
-    await vm.create ("founder", "gold", 200, {from: addr});
+    await vm.createVault ("founder", "gold", 200, {from: addr});
     assert.deepEqual (utils.ignoreCheckpoints (await utils.getMoves (acc, 0)), [
       ["ctrl", {"g": {"gid": {
         "create": "ctrl:1 for 200 gold of founder"
@@ -62,8 +63,8 @@ contract ("VaultManager", accounts => {
   });
 
   it ("creates vaults in the storage correctly", async () => {
-    await vm.create ("founder", "gold", 10, {from: addr});
-    await vm.create ("founder", "silver", 20, {from: addr});
+    await vm.createVault ("founder", "gold", 10, {from: addr});
+    await vm.createVault ("founder", "silver", 20, {from: addr});
 
     assert.equal (await vm.getNumVaults (), 2);
     assert.equal (await vm.getNextVaultId (), 3);
@@ -73,22 +74,22 @@ contract ("VaultManager", accounts => {
 
   it ("does not allow untradable assets", async () => {
     await truffleAssert.reverts (
-        vm.create ("founder", "iron", 5, {from: addr}),
+        vm.createVault ("founder", "iron", 5, {from: addr}),
         "invalid asset");
   });
 
   it ("does not allow zero initial balance", async () => {
     await truffleAssert.reverts (
-        vm.create ("founder", "gold", 0, {from: addr}),
+        vm.createVault ("founder", "gold", 0, {from: addr}),
         "initial balance must be positive");
   });
 
   it ("creates the right moves for sending from vaults", async () => {
-    await vm.create ("founder", "gold", 100, {from: addr});
-    await vm.create ("founder", "silver", 100, {from: addr});
+    await vm.createVault ("founder", "gold", 100, {from: addr});
+    await vm.createVault ("founder", "silver", 100, {from: addr});
     const afterCreate = await web3.eth.getBlockNumber () + 1;
-    await vm.send (1, "domob", 10, {from: addr});
-    await vm.send (2, "andy", 20, {from: addr});
+    await vm.sendFromVault (1, "domob", 10, {from: addr});
+    await vm.sendFromVault (2, "andy", 20, {from: addr});
     assert.deepEqual (
       utils.ignoreCheckpoints (await utils.getMoves (acc, afterCreate)), [
       ["ctrl", {"g": {"gid": {
@@ -101,37 +102,49 @@ contract ("VaultManager", accounts => {
   });
 
   it ("updates vaults correctly for sending", async () => {
-    await vm.create ("founder", "gold", 100, {from: addr});
-    await vm.create ("founder", "silver", 100, {from: addr});
+    await vm.createVault ("founder", "gold", 100, {from: addr});
+    await vm.createVault ("founder", "silver", 100, {from: addr});
 
-    await vm.send (1, "domob", 50, {from: addr});
-    await vm.send (2, "andy", 20, {from: addr});
-    await vm.send (1, "andy", 50, {from: addr});
+    await vm.sendFromVault (1, "domob", 50, {from: addr});
+    await vm.sendFromVault (2, "andy", 20, {from: addr});
+    await vm.sendFromVault (1, "andy", 50, {from: addr});
 
     utils.assertNoVault (vm, 1);
     utils.assertVault (vm, 2, "founder", "silver", 80);
   });
 
   it ("fails when sending more from a vault than exists", async () => {
-    await vm.create ("founder", "gold", 100, {from: addr});
-    await vm.create ("founder", "silver", 100, {from: addr});
+    await vm.createVault ("founder", "gold", 100, {from: addr});
+    await vm.createVault ("founder", "silver", 100, {from: addr});
 
     await truffleAssert.reverts (
-        vm.send (1, "domob", 0, {from: addr}),
+        vm.sendFromVault (1, "domob", 0, {from: addr}),
         "trying to send zero amount");
     await truffleAssert.reverts (
-        vm.send (100, "domob", 1, {from: addr}),
+        vm.sendFromVault (100, "domob", 1, {from: addr}),
         "revert");
 
-    await vm.send (1, "domob", 100, {from: addr});
-    await vm.send (2, "domob", 99, {from: addr});
+    await vm.sendFromVault (1, "domob", 100, {from: addr});
+    await vm.sendFromVault (2, "domob", 99, {from: addr});
 
     await truffleAssert.reverts (
-        vm.send (1, "domob", 1, {from: addr}),
+        vm.sendFromVault (1, "domob", 1, {from: addr}),
         "not enough funds");
     await truffleAssert.reverts (
-        vm.send (2, "domob", 2, {from: addr}),
+        vm.sendFromVault (2, "domob", 2, {from: addr}),
         "not enough funds");
+  });
+
+  it ("only allows the owner to create/send", async () => {
+    const mallory = accounts[1];
+    await vm.createVault ("founder", "gold", 100, {from: addr});
+
+    await truffleAssert.reverts (
+        vm.createVault ("founder", "silver", 10, {from: mallory}),
+        "not the owner");
+    await truffleAssert.reverts (
+        vm.sendFromVault (1, "domob", 10, {from: mallory}),
+        "not the owner");
   });
 
   it ("checks account permissions correctly", async () => {
@@ -167,7 +180,7 @@ contract ("VaultManager", accounts => {
   });
 
   it ("creates a checkpoint correctly", async () => {
-    await vm.create ("founder", "gold", 10, {from: addr});
+    await vm.createVault ("founder", "gold", 10, {from: addr});
     const blk = await web3.eth.getBlock ("latest");
 
     assert.equal (await getNumCheckpoints (), 0);
@@ -190,7 +203,7 @@ contract ("VaultManager", accounts => {
   it ("creates checkpoints only when needed", async () => {
     await vm.maybeCreateCheckpoint ();
     assert.equal (await getNumCheckpoints (), 0);
-    await vm.create ("founder", "gold", 10, {from: addr});
+    await vm.createVault ("founder", "gold", 10, {from: addr});
     assert.equal (await getNumCheckpoints (), 0);
     await vm.maybeCreateCheckpoint ();
     assert.equal (await getNumCheckpoints (), 1);
@@ -199,24 +212,24 @@ contract ("VaultManager", accounts => {
   });
 
   it ("auto-checkpoints multiple operations in a block correctly", async () => {
-    await vm.create ("founder", "gold", 10, {from: addr});
+    await vm.createVault ("founder", "gold", 10, {from: addr});
     assert.equal (await getNumCheckpoints (), 0);
 
     /* Perform two creates after each other in the next block.  This will
        checkpoint the vault created above, but only once, and also will not
        attempt to checkpoint the newly created vault.  */
-    await vm.createMany ("founder", "silver", [5, 10]);
+    await vm.createMany ("founder", "silver", [5, 10], {from: addr});
     assert.equal (await getNumCheckpoints (), 1);
 
     /* Perform a create and a spend-from-vault in the next block.  This
        will checkpoint the previous block (with the two vaults created
        there), but will not yet checkpoint the new one.  */
-    await vm.createAndSend ("founder", "copper", 10, "domob", 5);
+    await vm.createAndSend ("founder", "copper", 10, "domob", 5, {from: addr});
     assert.equal (await getNumCheckpoints (), 2);
 
     /* Do a single send, which will checkpoint the previous block as well.
        Then all checkpoints are done.  */
-    await vm.send (2, "domob", 1);
+    await vm.sendFromVault (2, "domob", 1, {from: addr});
     assert.equal (await getNumCheckpoints (), 3);
 
     await vm.maybeCreateCheckpoint ();

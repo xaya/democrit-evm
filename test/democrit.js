@@ -20,14 +20,14 @@ contract ("Democrit", accounts => {
     tc = await TestConfig.new ();
   });
 
-  let wchi, acc, del, dem;
+  let wchi, acc, del, vm, dem;
   beforeEach (async () => {
-    ({wchi, acc, del, dem}
+    ({wchi, acc, del, vm, dem}
         = await utils.setupTradingTest (tc, supply, buyer, seller, BALANCE));
   });
 
   it ("checks sell orders correctly", async () => {
-    await utils.createFounder (dem, buyer, "buyer");
+    await utils.createFounder (vm, buyer, "buyer");
     const tokenId = await acc.tokenIdForName ("p", "buyer");
 
     await dem.createSellOrder ("seller", "gold", 5, 10, {from: seller});

@@ -20,9 +20,9 @@ contract ("LimitSelling", accounts => {
     tc = await TestConfig.new ();
   });
 
-  let wchi, acc, del, dem;
+  let wchi, acc, del, vm, dem;
   beforeEach (async () => {
-    ({wchi, acc, del, dem}
+    ({wchi, acc, del, vm, dem}
         = await utils.setupTradingTest (tc, supply, buyer, seller, BALANCE));
   });
 
@@ -54,7 +54,7 @@ contract ("LimitSelling", accounts => {
   {
     const orderId = (await dem.nextOrderId ()).toNumber ();
     await dem.createSellOrder (seller, asset, amount, sats, {from});
-    const cpHash = await utils.createCheckpoint (dem);
+    const cpHash = await utils.createCheckpoint (vm);
     return {orderId, cpHash};
   }
 
@@ -129,8 +129,8 @@ contract ("LimitSelling", accounts => {
     await dem.createSellOrder ("seller", "gold", 5, 10, {from: seller});
     await dem.createSellOrder ("seller", "silver", 100, 1, {from: seller});
 
-    await utils.assertVault (dem, 1, "seller", "gold", 5);
-    await utils.assertVault (dem, 2, "seller", "silver", 100);
+    await utils.assertVault (vm, 1, "seller", "gold", 5);
+    await utils.assertVault (vm, 2, "seller", "silver", 100);
 
     await assertSellOrder (101, 1, seller, "seller", "gold", 5, 10);
     await assertSellOrder (102, 2, seller, "seller", "silver", 100, 1);
@@ -162,10 +162,10 @@ contract ("LimitSelling", accounts => {
     ]);
 
     await assertNoSellOrder (101);
-    await utils.assertNoVault (dem, 1);
+    await utils.assertNoVault (vm, 1);
 
     await assertSellOrder (102, 2, seller, "seller", "silver", 100, 1);
-    await utils.assertVault (dem, 2, "seller", "silver", 100);
+    await utils.assertVault (vm, 2, "seller", "silver", 100);
   });
 
   it ("fails to accept a non-existing order", async () => {
@@ -239,7 +239,7 @@ contract ("LimitSelling", accounts => {
       }}}],
     ]);
     assertNoSellOrder (orderId);
-    utils.assertNoVault (dem, 1);
+    utils.assertNoVault (vm, 1);
   });
 
   it ("accepts a full sell order correctly", async () => {
@@ -259,7 +259,7 @@ contract ("LimitSelling", accounts => {
     ]);
 
     await assertNoSellOrder (101);
-    await utils.assertNoVault (dem, 1);
+    await utils.assertNoVault (vm, 1);
 
     assert.equal (await wchi.balanceOf (seller), 10);
     assert.equal (await wchi.balanceOf (buyer), BALANCE - 10);
@@ -282,7 +282,7 @@ contract ("LimitSelling", accounts => {
     ]);
 
     await assertSellOrder (101, 1, seller, "seller", "gold", 3, 6);
-    await utils.assertVault (dem, 1, "seller", "gold", 3);
+    await utils.assertVault (vm, 1, "seller", "gold", 3);
 
     assert.equal (await wchi.balanceOf (seller), 4);
     assert.equal (await wchi.balanceOf (buyer), BALANCE - 4);
@@ -309,7 +309,7 @@ contract ("LimitSelling", accounts => {
     ]);
 
     await assertNoSellOrder (101);
-    await utils.assertNoVault (dem, 1);
+    await utils.assertNoVault (vm, 1);
 
     assert.equal (await wchi.balanceOf (seller), 10);
     assert.equal (await wchi.balanceOf (buyer), BALANCE - 10);

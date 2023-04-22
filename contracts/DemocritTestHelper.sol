@@ -4,6 +4,7 @@
 pragma solidity ^0.8.19;
 
 import "./Democrit.sol";
+import "./VaultManager.sol";
 
 /**
  * @dev Helper subcontract of Democrit, which does some tweaks for testing.
@@ -11,8 +12,8 @@ import "./Democrit.sol";
 contract DemocritTestHelper is Democrit
 {
 
-  constructor (XayaDelegation del, IDemocritConfig cfg, uint firstId)
-    Democrit(del, cfg)
+  constructor (VaultManager v, uint firstId)
+    Democrit(v)
   {
     /* In tests, we start with a higher order ID.  This ensures that
        order IDs do not match the associated vault IDs, which could lead

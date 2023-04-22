@@ -5,6 +5,7 @@ pragma solidity ^0.8.19;
 
 import "./VaultManager.sol";
 
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
 /**
@@ -12,8 +13,18 @@ import "@openzeppelin/contracts/utils/Context.sol";
  * (the "easy part").  Limit buy orders together with liquidity pools
  * are missing, and will be added in a subcontract.
  */
-contract LimitSelling is VaultManager, Context
+contract LimitSelling is Context
 {
+
+  /** @dev The VaultManager instance owned by this contract.  */
+  VaultManager public immutable vm;
+
+  /**
+   * @dev The WCHI contract used for trading.  This matches the WCHI
+   * in the VaultManager, but is replicated here to give easy access.
+   */
+  IERC20Metadata public immutable wchi;
+
 
   /**
    * @dev The data stored on chain for an active limit sell order.
@@ -105,9 +116,11 @@ contract LimitSelling is VaultManager, Context
   event Trade (string asset, uint amount, uint sats,
                string seller, string buyer);
 
-  constructor (XayaDelegation del, IDemocritConfig cfg)
-    VaultManager(del, cfg)
+  constructor (VaultManager v)
   {
+    vm = v;
+    wchi = vm.wchi ();
+
     /* We start with ID 1, so that an ID being zero can be taken to mean
        that data does not exist.  */
     nextOrderId = 1;
@@ -158,7 +171,7 @@ contract LimitSelling is VaultManager, Context
         return nullOrder;
       }
 
-    VaultData memory vault = getVault (vaultId);
+    VaultManager.VaultData memory vault = vm.getVault (vaultId);
     /* When the vault associated to an order is emptied, the order
        is removed as well.  So if the order exists, the vault must
        exist (with non-zero balance), too.  */
@@ -184,13 +197,13 @@ contract LimitSelling is VaultManager, Context
       public returns (uint)
   {
     require (amount > 0, "non-zero amount required");
-    require (hasAccountPermission (_msgSender (), seller),
+    require (vm.hasAccountPermission (_msgSender (), seller),
              "no permission to act on behalf of this account");
 
-    uint vaultId = createVault (seller, asset, amount);
+    uint vaultId = vm.createVault (seller, asset, amount);
     assert (vaultId > 0);
     uint orderId = nextOrderId++;
-    address creator = getAccountAddress (seller);
+    address creator = vm.getAccountAddress (seller);
 
     sellOrders[orderId] = SellOrder ({
       vaultId: vaultId,
@@ -211,10 +224,10 @@ contract LimitSelling is VaultManager, Context
   {
     CompleteSellOrder memory data = getSellOrder (orderId);
     require (data.orderId == orderId, "order does not exist");
-    require (hasAccountPermission (_msgSender (), data.seller),
+    require (vm.hasAccountPermission (_msgSender (), data.seller),
              "no permission to act on behalf of the seller account");
 
-    sendFromVault (data.vaultId, data.seller, data.remainingAmount);
+    vm.sendFromVault (data.vaultId, data.seller, data.remainingAmount);
     delete sellOrders[orderId];
     emit SellOrderRemoved (orderId);
   }
@@ -259,19 +272,19 @@ contract LimitSelling is VaultManager, Context
   {
     CompleteSellOrder memory data = getSellOrder (args.orderId);
     require (data.orderId > 0, "order does not exist");
-    require (isCheckpoint (args.checkpoint), "vault checkpoint is invalid");
+    require (vm.isCheckpoint (args.checkpoint), "vault checkpoint is invalid");
     /* Calculating the purchase amount of sats checks for the amount bought
        being non-zero and not exceeding the available amount already, so there
        is no need to explicitly check those here.  */
     uint sats = getSatsForPurchase (data.remainingAmount, data.totalSats,
                                     args.amountBought);
 
-    address sellerAddress = getAccountAddress (data.seller);
+    address sellerAddress = vm.getAccountAddress (data.seller);
     require (sellerAddress == data.creator, "seller name has been transferred");
 
     require (wchi.transferFrom (_msgSender (), sellerAddress, sats),
              "WCHI transfer failed");
-    sendFromVault (data.vaultId, args.buyer, args.amountBought);
+    vm.sendFromVault (data.vaultId, args.buyer, args.amountBought);
 
     emit Trade (data.asset, args.amountBought, sats, data.seller, args.buyer);
     if (args.amountBought == data.remainingAmount)
