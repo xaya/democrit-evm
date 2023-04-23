@@ -93,6 +93,20 @@ async function createFounder (vm, fromAccount, name)
 }
 
 /**
+ * Modifies the WCHI balance of the given account to be exactly the desired
+ * one, transferring coins to/from the supply account as needed.
+ */
+async function setWchiBalance (wchi, addr, balance, supply)
+{
+  const current = await wchi.balanceOf (addr);
+  if (current > balance)
+    await wchi.transfer (supply, current - balance, {from: addr});
+  else if (current < balance)
+    await wchi.transfer (addr, balance - current, {from: supply});
+  assert.equal (await wchi.balanceOf (addr), balance);
+}
+
+/**
  * Sets up the testing environment we use for "full trading" tests.
  * This deploys a DemocritTestHelper instance in addition to the basic
  * Xaya contracts, and sets up a buyer and seller account.  The buyer
@@ -114,11 +128,8 @@ async function setupTradingTest (testConfig, supply, buyer, seller, balance)
   await setupWchi (acc, supply, seller);
   await createFounder (vm, buyer, "buyer");
   await createFounder (vm, seller, "seller");
-  await wchi.transfer (supply, await wchi.balanceOf (seller), {from: seller});
-  await wchi.transfer (buyer, balance - (await wchi.balanceOf (buyer)),
-                       {from: supply});
-  assert.equal (await wchi.balanceOf (seller), 0);
-  assert.equal (await wchi.balanceOf (buyer), balance);
+  await setWchiBalance (wchi, seller, 0, supply);
+  await setWchiBalance (wchi, buyer, balance, supply);
   await wchi.approve (dem.address, maxUint256, {from: buyer});
 
   return {wchi, acc, del, vm, dem};
@@ -229,12 +240,11 @@ async function setupPoolOperator (dem, chiSupply, addr, name, signerAddr)
 {
   const vm = await VaultManager.at (await dem.vm ());
   const acc = await XayaAccounts.at (await vm.accountRegistry ());
+  const wchi = await WCHI.at (await acc.wchiToken ());
   await setupWchi (acc, chiSupply, addr);
   await createFounder (vm, addr, name);
   await acc.setApprovalForAll (signerAddr, true, {from: addr});
-
-  const balance = await wchi.balanceOf (addr);
-  await wchi.transfer (chiSupply, balance, {from: addr});
+  await setWchiBalance (wchi, addr, 0, chiSupply);
 }
 
 /* ************************************************************************** */
@@ -293,6 +303,65 @@ function assertSellOrderNull (data)
   assert.equal (data["totalSats"], "0");
 }
 
+/**
+ * Asserts that the given JSON data corresponds to a pool with the
+ * given data fields.
+ */
+function assertPoolData (data, vaultId, operator, asset, amount, fee)
+{
+  assert.equal (data["vaultId"], vaultId);
+  assert.equal (data["operator"], operator);
+  assert.equal (data["asset"], asset);
+  assert.equal (data["amount"], amount);
+  assert.equal (data["relFee"], fee);
+}
+
+/**
+ * Asserts that the given JSON data corresponds to a pool that does
+ * not exist (null data).
+ */
+function assertPoolNull (data)
+{
+  assert.equal (data["vaultId"], "0");
+  assert.equal (data["operator"], "");
+  assert.equal (data["asset"], "");
+  assert.equal (data["amount"], "0");
+  assert.equal (data["relFee"], "0");
+}
+
+/**
+ * Expects that the buy order data matches the given specifics.
+ */
+function assertBuyOrderData (data, orderId,
+                             poolId, poolOperator, poolAmount, poolFee,
+                             creator, buyer, asset, remainingAmount, totalSats)
+{
+  assert.equal (data["orderId"], orderId);
+  assert.equal (data["poolId"], poolId);
+  assertPoolData (data["poolData"], poolId, poolOperator,
+                  asset, poolAmount, poolFee);
+  assert.equal (data["creator"], creator);
+  assert.equal (data["buyer"], buyer);
+  assert.equal (data["asset"], asset);
+  assert.equal (data["remainingAmount"], remainingAmount);
+  assert.equal (data["totalSats"], totalSats);
+}
+
+/**
+ * Expects that the data matches a non-existing buy order.
+ */
+function assertBuyOrderNull (data)
+{
+  assert.equal (data["orderId"], "0");
+  assert.equal (data["poolId"], "0");
+  assertPoolNull (data["poolData"]);
+  assert.equal (data["creator"], nullAddress);
+  assert.equal (data["buyer"], "");
+  assert.equal (data["asset"], "");
+  assert.equal (data["remainingAmount"], "0");
+  assert.equal (data["totalSats"], "0");
+}
+
 /* ************************************************************************** */
 
 module.exports = {
@@ -302,6 +371,7 @@ module.exports = {
   initialiseContract,
   setupWchi,
   createFounder,
+  setWchiBalance,
   setupTradingTest,
   getMoves,
   getBestBlock,
@@ -313,4 +383,8 @@ module.exports = {
   assertNoVault,
   assertSellOrderData,
   assertSellOrderNull,
+  assertPoolData,
+  assertPoolNull,
+  assertBuyOrderData,
+  assertBuyOrderNull,
 };

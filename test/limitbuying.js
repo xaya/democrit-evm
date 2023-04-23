@@ -32,26 +32,20 @@ contract ("LimitBuying", accounts => {
   /* ************************************************************************ */
 
   /**
-   * Asserts that the given JSON data corresponds to a pool with the
-   * given data fields.
-   */
-  function assertPoolData (data, vaultId, operator, asset, amount, fee)
-  {
-    assert.equal (data["vaultId"], vaultId);
-    assert.equal (data["operator"], operator);
-    assert.equal (data["asset"], asset);
-    assert.equal (data["amount"], amount);
-    assert.equal (data["relFee"], fee);
-  }
-
-  /**
    * Expects that a pool with the given specifics exists.
    */
   async function assertPool (vaultId, operator, asset, amount, fee)
   {
     const data = await dem.getPool (vaultId);
-    assertPoolData (data, vaultId, operator, asset, amount, fee);
+    utils.assertPoolData (data, vaultId, operator, asset, amount, fee);
   }
+
+  /**
+   * Expects that no pool with the given ID exists.
+   */
+  async function assertNoPool (vaultId)
+  {
+    const data = await dem.getPool (vaultId);
 
   /**
    * Asserts that the given JSON data corresponds to a pool that does
@@ -65,14 +59,7 @@ contract ("LimitBuying", accounts => {
     assert.equal (data["amount"], "0");
     assert.equal (data["relFee"], "0");
   }
-
-  /**
-   * Expects that no pool with the given ID exists.
-   */
-  async function assertNoPool (vaultId)
-  {
-    const data = await dem.getPool (vaultId);
-    assertPoolNull (data);
+    utils.assertPoolNull (data);
   }
 
   it ("computes the pool fee correctly", async () => {
@@ -246,15 +233,10 @@ contract ("LimitBuying", accounts => {
                                  remainingAmount, totalSats)
   {
     const data = await dem.getBuyOrder (orderId);
-    assert.equal (data["orderId"], orderId);
-    assert.equal (data["poolId"], poolId);
-    assertPoolData (data["poolData"], poolId, poolOperator,
-                    asset, poolAmount, poolFee);
-    assert.equal (data["creator"], creator);
-    assert.equal (data["buyer"], buyer);
-    assert.equal (data["asset"], asset);
-    assert.equal (data["remainingAmount"], remainingAmount);
-    assert.equal (data["totalSats"], totalSats);
+    utils.assertBuyOrderData (data, orderId, poolId,
+                              poolOperator, poolAmount, poolFee,
+                              creator, buyer, asset,
+                              remainingAmount, totalSats);
   }
 
   /**
@@ -263,14 +245,7 @@ contract ("LimitBuying", accounts => {
   async function assertNoBuyOrder (orderId)
   {
     const data = await dem.getBuyOrder (orderId);
-    assert.equal (data["orderId"], "0");
-    assert.equal (data["poolId"], "0");
-    assertPoolNull (data["poolData"]);
-    assert.equal (data["creator"], utils.nullAddress);
-    assert.equal (data["buyer"], "");
-    assert.equal (data["asset"], "");
-    assert.equal (data["remainingAmount"], "0");
-    assert.equal (data["totalSats"], "0");
+    utils.assertBuyOrderNull (data);
   }
 
   /**
