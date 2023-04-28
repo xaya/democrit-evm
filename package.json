@@ -12,6 +12,8 @@
   "files": [
     "/contracts/*.sol",
     "/build/contracts/*.json",
+    "/poolbot/README.md",
+    "/poolbot/poolbot.py",
     "/subgraph/generated/**/*.ts",
     "/subgraph/schema.graphql",
     "/subgraph/subgraph.yaml",
