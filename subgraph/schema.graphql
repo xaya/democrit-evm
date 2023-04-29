@@ -25,6 +25,10 @@ type Vault @entity {
 
   "The associated SellOrder, if this vault corresponds to one."
   sellOrder: SellOrder
+  "The associated TradingPool, if this vault corresponds to one."
+  tradingPool: TradingPool
+  "The associated SellDeposit, if this vault corresponds to one."
+  sellDeposit: SellDeposit
 }
 
 # A currently active limit sell order in the book.
@@ -35,6 +39,41 @@ type SellOrder @entity {
   creator: Bytes!
   "The account name associated to the order/seller."
   seller: String!
+  asset: String!
+  amount: BigInt!
+  totalSats: BigInt!
+  price: BigDecimal!
+}
+
+# A trading pool that is active.
+type TradingPool @entity {
+  id: String!
+  vault: Vault!
+  operator: String!
+  endpoint: String
+  asset: String!
+  balance: BigInt!
+  relFee: BigInt!
+}
+
+# A sell deposit that is active.
+type SellDeposit @entity {
+  id: String!
+  vault: Vault!
+  owner: String!
+  asset: String!
+  balance: BigInt!
+}
+
+# A buy limit order that is currently active in the book.
+type BuyOrder @entity {
+  id: String!
+  "The trading pool used.  It will be set, but might refer to an emptied vault."
+  tradingPool: TradingPool
+  "The owner address when the order was created."
+  creator: Bytes!
+  "The account name associated to the order/buyer."
+  buyer: String!
   asset: String!
   amount: BigInt!
   totalSats: BigInt!

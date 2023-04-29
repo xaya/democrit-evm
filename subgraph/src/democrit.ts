@@ -3,6 +3,15 @@ import {
   SellOrderCreated as SellOrderCreatedEvent,
   SellOrderUpdated as SellOrderUpdatedEvent,
   SellOrderRemoved as SellOrderRemovedEvent,
+  PoolCreated as PoolCreatedEvent,
+  PoolUpdated as PoolUpdatedEvent,
+  PoolRemoved as PoolRemovedEvent,
+  SellDepositCreated as SellDepositCreatedEvent,
+  SellDepositUpdated as SellDepositUpdatedEvent,
+  SellDepositRemoved as SellDepositRemovedEvent,
+  BuyOrderCreated as BuyOrderCreatedEvent,
+  BuyOrderUpdated as BuyOrderUpdatedEvent,
+  BuyOrderRemoved as BuyOrderRemovedEvent,
 } from "../generated/Democrit/Democrit"
 
 import {
@@ -16,6 +25,9 @@ import {
   Trade,
   Vault,
   SellOrder,
+  TradingPool,
+  SellDeposit,
+  BuyOrder,
 } from "../generated/schema"
 
 import { BigInt, store } from "@graphprotocol/graph-ts"
@@ -101,8 +113,8 @@ export function handleSellOrderCreated (event: SellOrderCreatedEvent): void
   order.totalSats = event.params.totalSats
   order.price = order.totalSats.toBigDecimal () / order.amount.toBigDecimal ()
 
-  order.vault = vaultId;
-  let vault = Vault.load (vaultId);
+  order.vault = vaultId
+  let vault = Vault.load (vaultId)
   if (vault != null)
     {
       vault.sellOrder = id
@@ -129,4 +141,123 @@ export function handleSellOrderRemoved (event: SellOrderRemovedEvent): void
 {
   let id = event.params.orderId.toString ()
   store.remove ("SellOrder", id)
+}
+
+/* ************************************************************************** */
+
+export function handlePoolCreated (event: PoolCreatedEvent): void
+{
+  let vaultId = event.params.vaultId.toString ()
+  let pool = new TradingPool (vaultId)
+
+  pool.operator = event.params.operator
+  if (event.params.endpoint != "")
+    pool.endpoint = event.params.endpoint
+  pool.asset = event.params.asset
+  pool.balance = event.params.amount
+  pool.relFee = event.params.relFee
+
+  pool.vault = vaultId
+  let vault = Vault.load (vaultId)
+  if (vault != null)
+    {
+      vault.tradingPool = vaultId
+      vault.save ()
+    }
+
+  pool.save ()
+}
+
+export function handlePoolUpdated (event: PoolUpdatedEvent): void
+{
+  let id = event.params.vaultId.toString ()
+  let pool = TradingPool.load (id)
+  if (pool == null)
+    return
+
+  pool.balance = event.params.newAmount
+  pool.save ()
+}
+
+export function handlePoolRemoved (event: PoolRemovedEvent): void
+{
+  let id = event.params.vaultId.toString ()
+  store.remove ("TradingPool", id)
+}
+
+/* ************************************************************************** */
+
+export function handleDepositCreated (event: SellDepositCreatedEvent): void
+{
+  let vaultId = event.params.vaultId.toString ()
+  let deposit = new SellDeposit (vaultId)
+
+  deposit.owner = event.params.owner
+  deposit.asset = event.params.asset
+  deposit.balance = event.params.amount
+
+  deposit.vault = vaultId
+  let vault = Vault.load (vaultId)
+  if (vault != null)
+    {
+      vault.sellDeposit = vaultId
+      vault.save ()
+    }
+
+  deposit.save ()
+}
+
+export function handleDepositUpdated (event: SellDepositUpdatedEvent): void
+{
+  let id = event.params.vaultId.toString ()
+  let deposit = SellDeposit.load (id)
+  if (deposit == null)
+    return
+
+  deposit.balance = event.params.newAmount
+  deposit.save ()
+}
+
+export function handleDepositRemoved (event: SellDepositRemovedEvent): void
+{
+  let id = event.params.vaultId.toString ()
+  store.remove ("SellDeposit", id)
+}
+
+/* ************************************************************************** */
+
+export function handleBuyOrderCreated (event: BuyOrderCreatedEvent): void
+{
+  let id = event.params.orderId.toString ()
+  let poolId = event.params.poolId.toString ()
+  let order = new BuyOrder (id)
+
+  order.tradingPool = poolId
+  order.creator = event.params.creator
+  order.buyer = event.params.buyer
+  order.asset = event.params.asset
+  order.amount = event.params.amount
+  order.totalSats = event.params.totalSats
+  order.price = order.totalSats.toBigDecimal () / order.amount.toBigDecimal ()
+
+  order.save ()
+}
+
+export function handleBuyOrderUpdated (event: BuyOrderUpdatedEvent): void
+{
+  let id = event.params.orderId.toString ()
+  let order = BuyOrder.load (id)
+  if (order == null)
+    return
+
+  order.amount = event.params.amount
+  order.totalSats = event.params.totalSats
+  order.price = order.totalSats.toBigDecimal () / order.amount.toBigDecimal ()
+  order.save ()
+}
+
+export function handleBuyOrderRemoved (event: BuyOrderRemovedEvent): void
+{
+  let id = event.params.orderId.toString ()
+  store.remove ("BuyOrder", id)
 }

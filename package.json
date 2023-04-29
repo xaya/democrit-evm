@@ -1,6 +1,6 @@
 {
   "name": "@xaya/democrit-evm",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Smart contract component for the Democrit protocol.",
   "author": "Daniel Kraft <daniel@xaya.io>",
   "license": "MIT",
