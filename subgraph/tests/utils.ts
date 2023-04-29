@@ -3,13 +3,16 @@ import { Address, ethereum } from "@graphprotocol/graph-ts"
 
 import {
   Trade as TradeEvent,
-  VaultCreated as VaultCreatedEvent,
-  VaultChanged as VaultChangedEvent,
-  VaultEmptied as VaultEmptiedEvent,
   SellOrderCreated as SellOrderCreatedEvent,
   SellOrderUpdated as SellOrderUpdatedEvent,
   SellOrderRemoved as SellOrderRemovedEvent,
 } from "../generated/Democrit/Democrit"
+
+import {
+  VaultCreated as VaultCreatedEvent,
+  VaultChanged as VaultChangedEvent,
+  VaultEmptied as VaultEmptiedEvent,
+} from "../generated/VaultManager/VaultManager"
 
 import {
   handleTrade,

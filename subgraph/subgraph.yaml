@@ -19,7 +19,6 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - Trade
-        - Vault
         - SellOrder
       abis:
         - name: Democrit
@@ -27,16 +26,38 @@ dataSources:
       eventHandlers:
         - event: Trade(string,uint256,uint256,string,string)
           handler: handleTrade
-        - event: VaultCreated(string,uint256,string,string,uint256)
-          handler: handleVaultCreated
-        - event: VaultChanged(string,uint256,string,uint256)
-          handler: handleVaultChanged
-        - event: VaultEmptied(string,uint256)
-          handler: handleVaultEmptied
         - event: SellOrderCreated(uint256,uint256,address,string,string,uint256,uint256)
           handler: handleSellOrderCreated
         - event: SellOrderUpdated(uint256,uint256,uint256)
           handler: handleSellOrderUpdated
         - event: SellOrderRemoved(uint256)
           handler: handleSellOrderRemoved
+      file: ./src/democrit.ts
+  - kind: ethereum
+    name: VaultManager
+    # Network and source are just dummy values here (corresponding to
+    # the first test deployment made of a Democrit contract).  This
+    # subgraph is not meant to be directly deployed, but just used for
+    # development and deployed as part of a project using Democrit.
+    network: mumbai
+    source:
+      address: "0x6918eb2A0aE36ae686Fd810b6253dB857Dbce4ed"
+      abi: VaultManager
+      startBlock: 33586936
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Vault
+      abis:
+        - name: VaultManager
+          file: ./abis/VaultManager.json
+      eventHandlers:
+        - event: VaultCreated(string,uint256,string,string,uint256)
+          handler: handleVaultCreated
+        - event: VaultChanged(string,uint256,string,uint256)
+          handler: handleVaultChanged
+        - event: VaultEmptied(string,uint256)
+          handler: handleVaultEmptied
       file: ./src/democrit.ts
