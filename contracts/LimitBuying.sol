@@ -590,7 +590,7 @@ contract LimitBuying is LimitSelling, EIP712
    * @dev Accepts a limit buy order, selling all or part of the desired asset
    * utilising a sell deposit and trading pool.
    */
-  function acceptBuyOrder (AcceptedBuyOrder calldata args) public
+  function acceptBuyOrder (AcceptedBuyOrder calldata args) public virtual
   {
     CompleteBuyOrder memory order = getBuyOrder (args.orderId);
     require (order.orderId > 0, "order does not exist");

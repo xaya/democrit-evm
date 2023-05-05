@@ -267,7 +267,7 @@ contract LimitSelling is Context
    * asset.  The payment is taken in WCHI from the _msgSender() and
    * forwarded to the current owner of the seller account name.
    */
-  function acceptSellOrder (AcceptedSellOrder calldata args) public
+  function acceptSellOrder (AcceptedSellOrder calldata args) public virtual
   {
     CompleteSellOrder memory data = getSellOrder (args.orderId);
     require (data.orderId > 0, "order does not exist");
