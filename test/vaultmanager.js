@@ -84,6 +84,16 @@ contract ("VaultManager", accounts => {
         "initial balance must be positive");
   });
 
+  it ("does not create a vault if uninitialised", async () => {
+    const vm2 = await VaultManagerTestHelper.new (del.address, tc.address,
+                                                  {from: addr});
+    await wchi.transfer (vm2.address, 1000000, {from: addr});
+    await utils.createFounder (vm2, addr, "founder2");
+    await truffleAssert.reverts (
+        vm2.createVault ("founder2", "gold", 10, {from: addr}),
+        "contract is not initialised");
+  });
+
   it ("creates the right moves for sending from vaults", async () => {
     await vm.createVault ("founder", "gold", 100, {from: addr});
     await vm.createVault ("founder", "silver", 100, {from: addr});
