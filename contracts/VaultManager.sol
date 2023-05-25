@@ -257,6 +257,9 @@ contract VaultManager is AccountHolder, Ownable
    */
   function maybeCreateCheckpoint () public
   {
+    /* Checkpoints can only be done for blocks below the current block, and
+       not for vaults that have been created in the current block itself,
+       since for this block, the hash is not yet known.  */
     uint h = uncheckpointedHeight;
     if (h == 0 || h >= block.number)
       return;
