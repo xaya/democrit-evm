@@ -1,4 +1,4 @@
-# Copyright (C) 2023 Autonomous Worlds Ltd
+# Copyright (C) 2023-2024 Autonomous Worlds Ltd
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,8 +9,6 @@ vault checks for a trading pool in Democrit-EVM.
 
 
 from contextlib import contextmanager
-import json
-import os.path
 import threading
 
 import jsonrpclib
@@ -68,31 +66,21 @@ class Signer:
   contract's required EIP712 struct.
   """
 
-  def __init__ (self, w3, contractAddr, operator, key):
+  def __init__ (self, w3, loadAbi, contractAddr, operator, key):
     self.w3 = w3
     self.chainId = self.w3.eth.chain_id
     self.account = Account.from_key (key)
     self.operator = operator
 
-    # We expect this script to be run in the context of the NPM package.
-    # From this, we can load the contract ABI based on the path this
-    # Python file is in.
-    pyPath = os.path.dirname (os.path.abspath (__file__))
-    topPath = os.path.dirname (pyPath)
-    abiPath = os.path.join (topPath, "build", "contracts")
-    with open (os.path.join (abiPath, "Democrit.json"), "rt") as f:
-      data = json.load (f)
-    self.c = self.w3.eth.contract (abi=data["abi"], address=contractAddr)
+    self.c = self.w3.eth.contract (abi=loadAbi ("Democrit"),
+                                   address=contractAddr)
 
     vmAddr = self.c.functions.vm ().call ()
-    with open (os.path.join (abiPath, "VaultManager.json"), "rt") as f:
-      data = json.load (f)
-    vm = self.w3.eth.contract (abi=data["abi"], address=vmAddr)
+    vm = self.w3.eth.contract (abi=loadAbi ("VaultManager"), address=vmAddr)
 
     configAddr = self.c.functions.config ().call ()
-    with open (os.path.join (abiPath, "IDemocritConfig.json"), "rt") as f:
-      data = json.load (f)
-    config = self.w3.eth.contract (abi=data["abi"], address=configAddr)
+    config = self.w3.eth.contract (abi=loadAbi ("IDemocritConfig"),
+                                   address=configAddr)
     self.gameId = config.functions.gameId ().call ()
 
     contractName = self.c.functions.EIP712_NAME ().call ()
@@ -160,9 +148,9 @@ class VaultCheckServer:
   signature.
   """
 
-  def __init__ (self, checker, w3, contractAddr, operator, key):
+  def __init__ (self, checker, signer):
     self.checker = checker
-    self.signer = Signer (w3, contractAddr, operator, key)
+    self.signer = signer
 
     # Rough sanity check that the "right" GSP is connected.  Of course, it
     # could still be a wrong version.  The chain most likely needs not be
@@ -192,11 +180,11 @@ class VaultCheckServer:
         "democrit": {
           "chainid": self.signer.chainId,
           "gameid": self.signer.gameId,
-          "contract": contractAddr,
+          "contract": self.signer.c.address,
           "controller": self.signer.controller,
         },
         "pool": {
-          "operator": operator,
+          "operator": self.signer.operator,
           "signer": self.signer.account.address,
         },
       }
