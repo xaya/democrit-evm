@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Autonomous Worlds Ltd
+# Copyright (C) 2023-2025 Autonomous Worlds Ltd
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,7 +15,7 @@ import jsonrpclib
 from jsonrpclib.SimpleJSONRPCServer import PooledJSONRPCServer
 
 from eth_account import Account
-from eth_account.messages import encode_structured_data
+from eth_account.messages import encode_typed_data
 
 
 # The EIP712 name and version that is expected from the contract,
@@ -134,7 +134,7 @@ class Signer:
       },
     }
 
-    encoded = encode_structured_data (msg)
+    encoded = encode_typed_data (full_message=msg)
     signed = self.account.sign_message (encoded)
 
     return signed.signature
@@ -169,7 +169,7 @@ class VaultCheckServer:
           "vaultId": vaultId,
           "checkpoint": checkpoint,
         },
-        "signature": signature.hex (),
+        "signature": "0x" + signature.hex (),
       }
     self.signVaultCheck = signVaultCheck
 
