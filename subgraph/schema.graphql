@@ -16,7 +16,7 @@ type Trade @entity (immutable: true) {
 
 # A vault that is currently existing and not yet emptied.  Only vaults
 # controlled by the contract are considered.
-type Vault @entity {
+type Vault @entity (immutable: false) {
   "The vaultId field.  The controller is always the contract's account."
   id: String!
   founder: String!
@@ -32,7 +32,7 @@ type Vault @entity {
 }
 
 # A currently active limit sell order in the book.
-type SellOrder @entity {
+type SellOrder @entity (immutable: false) {
   id: String!
   vault: Vault!
   "The owner address when the order was created."
@@ -46,7 +46,7 @@ type SellOrder @entity {
 }
 
 # A trading pool that is active.
-type TradingPool @entity {
+type TradingPool @entity (immutable: false) {
   id: String!
   vault: Vault!
   operator: String!
@@ -57,7 +57,7 @@ type TradingPool @entity {
 }
 
 # A sell deposit that is active.
-type SellDeposit @entity {
+type SellDeposit @entity (immutable: false) {
   id: String!
   vault: Vault!
   owner: String!
@@ -66,7 +66,7 @@ type SellDeposit @entity {
 }
 
 # A buy limit order that is currently active in the book.
-type BuyOrder @entity {
+type BuyOrder @entity (immutable: false) {
   id: String!
   "The trading pool used.  It will be set, but might refer to an emptied vault."
   tradingPool: TradingPool
@@ -81,7 +81,7 @@ type BuyOrder @entity {
 }
 
 # A helper table, which records the next ID to give out to trades.
-type AutoId @entity {
+type AutoId @entity (immutable: false) {
   "A string identifying the sequence (e.g. Trade)."
   id: String!
   next: BigInt!
