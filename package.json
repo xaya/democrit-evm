@@ -22,9 +22,9 @@
   ],
   "dependencies": {
     "@graphprotocol/graph-ts": "",
-    "@openzeppelin/contracts": "4.8.0",
-    "@xaya/eth-account-registry": "1.0.0",
-    "@xaya/eth-delegator-contract": "1.0.0"
+    "@openzeppelin/contracts": "4.9.6",
+    "@xaya/eth-account-registry": "./lib/polygon-contract",
+    "@xaya/eth-delegator-contract": "./lib/delegation-contract"
   },
   "devDependencies": {
     "matchstick-as": "",

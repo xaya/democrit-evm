@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2023 Autonomous Worlds Ltd
+// Copyright (C) 2023-2025 Autonomous Worlds Ltd
 
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@xaya/eth-account-registry/contracts/IXayaAccounts.sol";
-import "@xaya/eth-delegator-contract/contracts/XayaDelegation.sol";
+import "@xaya/eth-account-registry/src/IXayaAccounts.sol";
+import "@xaya/eth-delegator-contract/src/XayaDelegation.sol";
 
 /**
  * @dev This defines a contract that owns a Xaya account and is able to send
