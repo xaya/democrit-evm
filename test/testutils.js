@@ -7,18 +7,89 @@ const wchiData = require ("@xaya/wchi/build/contracts/WCHI.json");
 const WCHI = truffleContract (wchiData);
 WCHI.setProvider (web3.currentProvider);
 
+/**
+ * Converts a Forge/Foundry build artifact to Truffle artifact format
+ * @param {Object} forgeArtifact - The artifact object from forge build (loaded via require)
+ * @param {string} contractName - The name of the contract (optional, will try to extract from artifact)
+ * @returns {Object} Truffle-compatible artifact object
+ */
+function forgeToTruffle(forgeArtifact, contractName = null) {
+  // Extract bytecode helper
+  const extractBytecode = (bytecodeObj) => {
+    if (!bytecodeObj) return '0x';
+    
+    if (typeof bytecodeObj === 'string') {
+      return bytecodeObj.startsWith('0x') ? bytecodeObj : '0x' + bytecodeObj;
+    }
+    
+    if (bytecodeObj.object !== undefined) {
+      const code = bytecodeObj.object;
+      return code.startsWith('0x') ? code : '0x' + code;
+    }
+    
+    return '0x';
+  };
+  
+  // Extract contract name if not provided
+  let name = contractName;
+  if (!name) {
+    if (forgeArtifact.metadata?.settings?.compilationTarget) {
+      const targets = forgeArtifact.metadata.settings.compilationTarget;
+      const contractNames = Object.values(targets);
+      if (contractNames.length > 0) {
+        name = contractNames[0];
+      }
+    }
+    name = name || 'Contract';
+  }
+  
+  // Build and return the Truffle artifact structure
+  const truffleArtifact = {
+    contractName: name,
+    abi: forgeArtifact.abi || [],
+    bytecode: extractBytecode(forgeArtifact.bytecode),
+    deployedBytecode: extractBytecode(forgeArtifact.deployedBytecode),
+    sourceMap: forgeArtifact.bytecode?.sourceMap || '',
+    deployedSourceMap: forgeArtifact.deployedBytecode?.sourceMap || '',
+    compiler: {
+      name: 'solc',
+      version: forgeArtifact.metadata?.compiler?.version || 
+               forgeArtifact.metadata?.solcVersion || 
+               'unknown'
+    },
+    networks: {},
+    schemaVersion: '3.4.0',
+    updatedAt: new Date().toISOString(),
+    linkReferences: forgeArtifact.bytecode?.linkReferences || {},
+    deployedLinkReferences: forgeArtifact.deployedBytecode?.linkReferences || {}
+  };
+  
+  if (forgeArtifact.ast) {
+    truffleArtifact.ast = forgeArtifact.ast;
+  }
+  
+  if (forgeArtifact.metadata?.settings?.compilationTarget) {
+    const sourcePath = Object.keys(forgeArtifact.metadata.settings.compilationTarget)[0];
+    if (sourcePath) {
+      truffleArtifact.sourcePath = sourcePath;
+    }
+  }
+  
+  return truffleArtifact;
+}
+
 const policyData
-    = require ("@xaya/eth-account-registry/build/contracts/TestPolicy.json");
-const TestPolicy = truffleContract (policyData);
+    = require ("@xaya/eth-account-registry/out/TestPolicy.sol/TestPolicy.json");
+const TestPolicy = truffleContract (forgeToTruffle (policyData));
 TestPolicy.setProvider (web3.currentProvider);
 const accountsData
-    = require ("@xaya/eth-account-registry/build/contracts/XayaAccounts.json");
-const XayaAccounts = truffleContract (accountsData);
+    = require ("@xaya/eth-account-registry/out/XayaAccounts.sol/XayaAccounts.json");
+const XayaAccounts = truffleContract (forgeToTruffle (accountsData));
 XayaAccounts.setProvider (web3.currentProvider);
 
 const delegatorData
-    = require ("@xaya/eth-delegator-contract/build/contracts/XayaDelegation.json");
-const XayaDelegation = truffleContract (delegatorData);
+    = require ("@xaya/eth-delegator-contract/out/XayaDelegation.sol/XayaDelegation.json");
+const XayaDelegation = truffleContract (forgeToTruffle (delegatorData));
 XayaDelegation.setProvider (web3.currentProvider);
 
 const VaultManager = artifacts.require ("VaultManager");

@@ -27,12 +27,12 @@
     "@xaya/eth-delegator-contract": "./lib/delegation-contract"
   },
   "devDependencies": {
-    "matchstick-as": "",
-    "solidity-coverage": "0.7.22",
-    "truffle": "5.4.29",
-    "truffle-assertions": "",
     "@openzeppelin/test-helpers": "",
     "@truffle/contract": "",
-    "@xaya/wchi": "1.0.0"
+    "@xaya/wchi": "1.0.0",
+    "matchstick-as": "",
+    "solidity-coverage": "0.7.22",
+    "truffle": "^5.11.5",
+    "truffle-assertions": ""
   }
 }
