@@ -1,0 +1,3 @@
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+@xaya/eth-delegator-contract/=lib/delegation-contract/
+@xaya/eth-account-registry/=lib/polygon-contract/
