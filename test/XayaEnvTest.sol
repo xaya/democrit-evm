@@ -4,6 +4,7 @@
 pragma solidity ^0.8.19;
 
 import "../src/AccountHolder.sol";
+import "../src/VaultManager.sol";
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@xaya/eth-account-registry/src/XayaAccounts.sol";
@@ -135,6 +136,22 @@ contract XayaEnvTest is Test
   }
 
   /**
+   * @dev Registers a name (to be used as founder) with the required approvals
+   * set up for the delegation contract.
+   */
+  function createFounder (VaultManager vman, address from, string memory name)
+      internal
+  {
+    vm.startPrank (from);
+    acc.register ("p", name);
+    acc.setApprovalForAll (address (del), true);
+    string[] memory path = new string[] (1);
+    path[0] = "g";
+    del.grant ("p", name, path, address (vman), type (uint256).max, false);
+    vm.stopPrank ();
+  }
+
+  /**
    * @dev Data about an expected move.
    */
   struct ExpectedMove
@@ -180,6 +197,31 @@ contract XayaEnvTest is Test
     ExpectedMove[] memory expected = new ExpectedMove[] (1);
     expected[0] = ExpectedMove (name, mv, mover);
     expectMoves (expected);
+  }
+
+  /**
+   * @dev Asserts that the given vault does not exist or has been emptied.
+   */
+  function assertNoVault (VaultManager vman, uint256 id) internal view
+  {
+    VaultManager.VaultData memory res = vman.getVault (id);
+    assertEq (res.founder, "");
+    assertEq (res.asset, "");
+    assertEq (res.balance, 0);
+  }
+
+  /**
+   * @dev Asserts that the vault with given index matches the data.
+   */
+  function assertVault (VaultManager vman, uint256 id,
+                        string memory founder, string memory asset,
+                        uint256 balance)
+      internal view
+  {
+    VaultManager.VaultData memory res = vman.getVault (id);
+    assertEq (res.founder, founder);
+    assertEq (res.asset, asset);
+    assertEq (res.balance, balance);
   }
 
 }
