@@ -8,6 +8,8 @@ import "./TestConfig.sol";
 import "./XayaEnvTest.sol";
 import "../src/VaultManager.sol";
 
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+
 /**
  * @dev Test fixture that sets up a full trading environment for testing
  * the Democrit contracts.
@@ -37,7 +39,7 @@ contract TradingTest is XayaEnvTest
     tc = new TestConfig ();
   }
 
-  function setUp () public override
+  function setUp () public virtual override
   {
     XayaEnvTest.setUp ();
 
@@ -95,6 +97,54 @@ contract TradingTest is XayaEnvTest
   }
 
   /**
+   * @dev Sets up things for a pool operator account with the given
+   * address and name.  The address is left with no WCHI balance after
+   * creating the name.
+   */
+  function setupPoolOperator (address addr, string memory name, address signer)
+      internal
+  {
+    setupWchi (addr);
+    createFounder (vman, addr, name);
+
+    vm.prank (addr);
+    acc.setApprovalForAll (signer, true);
+
+    setWchiBalance (addr, 0);
+  }
+
+  /**
+   * @dev Signs a VaultCheck for the given vault and checkpoint using
+   * EIP-712 signatures.
+   *
+   * Returns both the VaultCheck struct and the signature bytes.
+   */
+  function signVaultCheck (string memory operator, uint256 signerKey,
+                           uint256 vaultId, bytes32 checkpoint)
+      internal view
+      returns (LimitBuying.VaultCheck memory vault, bytes memory signature)
+  {
+    uint256 nonce = dem.signatureNonce (operator);
+
+    bytes32 structHash = keccak256 (abi.encode (
+      keccak256 ("VaultCheck(uint256 vaultId,bytes32 checkpoint,uint256 nonce)"),
+      vaultId,
+      checkpoint,
+      nonce
+    ));
+
+    bytes32 digest = ECDSA.toTypedDataHash (dem.domainSeparator (), structHash);
+
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign (signerKey, digest);
+    signature = abi.encodePacked (r, s, v);
+
+    vault = LimitBuying.VaultCheck ({
+      vaultId: vaultId,
+      checkpoint: checkpoint
+    });
+  }
+
+  /**
    * @dev Asserts that the given sell order data matches the null data,
    * i.e. a sell order that doesn't exist.
    */
@@ -127,6 +177,76 @@ contract TradingTest is XayaEnvTest
     assertEq (data.asset, asset);
     assertEq (data.remainingAmount, amount);
     assertEq (data.totalSats, sats);
+  }
+
+  /**
+   * @dev Asserts that the given pool data matches the null data,
+   * i.e. a pool that doesn't exist.
+   */
+  function assertPoolNull (LimitBuying.CompletePool memory data)
+      internal pure
+  {
+    assertEq (data.vaultId, 0);
+    assertEq (data.operator, "");
+    assertEq (data.asset, "");
+    assertEq (data.amount, 0);
+    assertEq (data.relFee, 0);
+  }
+
+  /**
+   * @dev Asserts that the given pool matches the expected data.
+   */
+  function assertPoolData (LimitBuying.CompletePool memory data,
+                           uint256 vaultId, string memory operator,
+                           string memory asset,
+                           uint256 amount, uint64 fee)
+      internal pure
+  {
+    assertEq (data.vaultId, vaultId);
+    assertEq (data.operator, operator);
+    assertEq (data.asset, asset);
+    assertEq (data.amount, amount);
+    assertEq (data.relFee, fee);
+  }
+
+  /**
+   * @dev Asserts that the given buy order data matches the null data,
+   * i.e. a buy order that doesn't exist.
+   */
+  function assertBuyOrderNull (LimitBuying.CompleteBuyOrder memory data)
+      internal pure
+  {
+    assertEq (data.orderId, 0);
+    assertEq (data.poolId, 0);
+    assertPoolNull (data.poolData);
+    assertEq (data.creator, address (0));
+    assertEq (data.buyer, "");
+    assertEq (data.asset, "");
+    assertEq (data.remainingAmount, 0);
+    assertEq (data.totalSats, 0);
+  }
+
+  /**
+   * @dev Asserts that the given buy order matches the expected data.
+   */
+  function assertBuyOrderData (LimitBuying.CompleteBuyOrder memory data,
+                               uint256 orderId,
+                               uint256 poolId, string memory poolOperator,
+                               uint256 poolAmount, uint64 poolFee,
+                               address creator, string memory buy,
+                               string memory asset,
+                               uint256 remainingAmount, uint256 totalSats)
+      internal pure
+  {
+    assertEq (data.orderId, orderId);
+    assertEq (data.poolId, poolId);
+    assertPoolData (data.poolData, poolId, poolOperator,
+                    asset, poolAmount, poolFee);
+    assertEq (data.creator, creator);
+    assertEq (data.buyer, buy);
+    assertEq (data.asset, asset);
+    assertEq (data.remainingAmount, remainingAmount);
+    assertEq (data.totalSats, totalSats);
   }
 
 }
