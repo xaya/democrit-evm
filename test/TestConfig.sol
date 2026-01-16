@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.19;
 
-import "./IDemocritConfig.sol";
+import "../src/IDemocritConfig.sol";
 
 import "@openzeppelin/contracts/utils/Strings.sol";
 

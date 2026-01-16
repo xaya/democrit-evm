@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2023 Autonomous Worlds Ltd
+// Copyright (C) 2023-2026 Autonomous Worlds Ltd
 
 pragma solidity ^0.8.19;
 
-import "./Democrit.sol";
-import "./VaultManager.sol";
+import "../src/Democrit.sol";
+import "../src/VaultManager.sol";
 
 /**
  * @dev Helper subcontract of Democrit, which does some tweaks for testing.

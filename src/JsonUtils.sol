@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2023 Autonomous Worlds Ltd
+// Copyright (C) 2023-2025 Autonomous Worlds Ltd
 
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "@xaya/eth-account-registry/contracts/HexEscapes.sol";
-import "@xaya/eth-account-registry/contracts/Utf8.sol";
+import "@xaya/eth-account-registry/src/HexEscapes.sol";
+import "@xaya/eth-account-registry/src/Utf8.sol";
 
 /**
  * @dev A basic utility library for dealing with JSON (which we need for
@@ -51,10 +51,14 @@ library JsonUtils
         if (cp == 0x22 || cp == 0x5C)
           {
             out[len++] = '\\';
+            // forge-lint: disable-next-line(unsafe-typecast)
             out[len++] = bytes1 (uint8 (cp));
           }
         else if (cp >= 0x20 && cp < 0x7F)
-          out[len++] = bytes1 (uint8 (cp));
+          {
+            // forge-lint: disable-next-line(unsafe-typecast)
+            out[len++] = bytes1 (uint8 (cp));
+          }
         else
           {
             bytes memory escape = bytes (HexEscapes.jsonCodepoint (cp));
