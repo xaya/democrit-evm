@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2025 Autonomous Worlds Ltd
+# Copyright (C) 2023-2026 Autonomous Worlds Ltd
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -197,7 +197,8 @@ class VaultCheckServer:
     is over, the server will be stopped.
     """
 
-    server = PooledJSONRPCServer (bind)
+    cfg = jsonrpclib.config.Config (send_exception_details=True)
+    server = PooledJSONRPCServer (bind, config=cfg)
     server.register_function (self.signVaultCheck, "signvaultcheck")
     server.register_function (self.getInfo, "getinfo")
 
